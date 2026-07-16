@@ -23,7 +23,7 @@ export function CategoryGrid() {
         {categories.map((cat, i) => (
           <Reveal key={cat.slug} delay={i * 40}>
             <Link
-              href={`/catalog/${cat.slug}`}
+              href={`/catalog?category=${cat.slug}`}
               className="group relative flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
             >
               <div className="absolute right-0 top-0 h-24 w-24 opacity-20 transition-transform duration-500 group-hover:scale-110">
