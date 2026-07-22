@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { Phone, Mail, MapPin, Clock, Send, Camera, Play, MessageCircle } from 'lucide-react'
-import { Logo } from '@/components/site/header'
 import { categories, brands } from '@/lib/data'
 import { contact } from '@/lib/nav'
 
@@ -11,11 +10,11 @@ export function Footer() {
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           {/* Company */}
           <div>
-            <Logo />
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              ELTOY STROY — Кыргызстандагы профессионалдык электроинструменттер жана курулуш
-              жабдууларынын ишенимдүү дүкөнү. Түп нуска товарлар, расмий кепилдик жана тез жеткирүү.
-            </p>
+           <Link href="/" className="flex items-center gap-2">
+  <span className="font-extrabold text-xl tracking-wider text-primary uppercase">
+    ELTOY STROY
+  </span>
+</Link>
             <div className="mt-5 flex gap-2">
               <a
                 href={`https://wa.me/${contact.whatsapp}`}

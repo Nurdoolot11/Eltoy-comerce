@@ -36,16 +36,24 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button render={<Link href="/catalog" />} size="lg" className="h-12 gap-2 px-6 text-sm font-semibold uppercase tracking-wide">
+            <Button
+              nativeButton={false}
+              render={<Link href="/catalog" />}
+              size="lg"
+              className="h-12 gap-2 px-6 text-sm font-semibold uppercase tracking-wide"
+            >
               Каталогго өтүү
               <ArrowRight className="h-4 w-4" />
             </Button>
             <Button
+              nativeButton={false}
               render={<Link href="/brands" />}
               size="lg"
               variant="outline"
               className="h-12 border-border bg-transparent px-6 text-sm font-semibold uppercase tracking-wide"
-            >Бренддер</Button>
+            >
+              Бренддер
+            </Button>
           </div>
 
           <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-muted-foreground">

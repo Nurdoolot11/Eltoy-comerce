@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useCart } from '@/components/cart/cart-provider'
 import { useAuth } from '@/components/auth/auth-provider'
-import { AuthDialog } from '@/components/auth/auth-dialog'
 import { addOrder, type DemoOrder } from '@/lib/demo-store'
 import { formatSom } from '@/lib/data'
 
@@ -19,55 +18,86 @@ export function CheckoutClient() {
   const [payment, setPayment] = useState('card')
   const [loading, setLoading] = useState(false)
   const [paid, setPaid] = useState(false)
-  
-  // Кардардын дарегин сактоо үчүн state
+
+  // Формадагы талаалар
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
 
-  // Баракча жүктөлгөндө мурунку сакталган даректи localStorage'ден окуу
+  // Мурунку маалыматтарды же Auth сакталган болсо окуу
   useEffect(() => {
+    if (user) {
+      setName(user.name || '')
+      setPhone(user.phone || '')
+    } else {
+      setName('ELTOY Администратор')
+      setPhone('+996 700 000 001')
+    }
+
     const savedAddress = localStorage.getItem('eltoy_customer_address')
     if (savedAddress) {
       setAddress(savedAddress)
     }
-  }, [])
+  }, [user])
 
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!user) return
     setLoading(true)
-    const data = new FormData(e.currentTarget)
-    const finalAddress = String(data.get('address'))
 
-    // Жаңы даректи кийинкиге эстеп калуу үчүн сактайбыз
-    localStorage.setItem('eltoy_customer_address', finalAddress)
+    // Даректи кийинкиге сактап коюу
+    localStorage.setItem('eltoy_customer_address', address)
 
     setTimeout(() => {
+      const orderId = `ES-${Date.now().toString().slice(-6)}`
+      
+      const orderItems = items.flatMap(i => {
+        const p = getProductById(i.id)
+        return p ? [{ id: p.id, name: p.name, price: p.price, quantity: i.quantity }] : []
+      })
+
       const order: DemoOrder = {
-        id: `ES-${Date.now().toString().slice(-8)}`,
-        userId: user.id,
-        customer: String(data.get('name')),
-        phone: String(data.get('phone')),
-        address: finalAddress,
-        items: items.flatMap(i => {
-          const p = getProductById(i.id)
-          return p ? [{ id: p.id, name: p.name, price: p.price, quantity: i.quantity }] : []
-        }),
+        id: orderId,
+        userId: user?.id || 'guest',
+        customer: name || 'ELTOY Администратор',
+        phone: phone || '+996 700 000 001',
+        address: address || 'Бишкек ш., Жибек Жолу 234',
+        items: orderItems,
         total: cartTotal,
         payment,
         status: 'Кабыл алынды',
         createdAt: new Date().toISOString()
       }
+
+      // 1. Демо-сторго кошуу
       addOrder(order)
+
+      // 2. LocalStorage'го сактоо (Админка сөзсүз көрүшү үчүн)
+      const existingOrders = JSON.parse(localStorage.getItem('eltoy_orders') || '[]')
+      localStorage.setItem('eltoy_orders', JSON.stringify([order, ...existingOrders]))
+
       clearCart()
       setLoading(false)
       setPaid(true)
-      setTimeout(() => router.push(`/invoice/${order.id}`), 900)
-    }, 1400)
+
+      // 1.5 секунддан кийин чекти көрсөтүү же Админкага өтүү
+      setTimeout(() => router.push(`/invoice/${order.id}`), 1200)
+    }, 1000)
   }
 
-  if (paid) return <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center"><CheckCircle2 className="size-16 text-primary" /><h1 className="font-mono text-3xl font-bold uppercase">Төлөм ийгиликтүү</h1><p className="text-muted-foreground">Электрондук чек даярдалууда...</p></div>
-  if (!items.length) return <div className="container-px mx-auto max-w-3xl py-24 text-center"><h1 className="font-mono text-3xl font-bold uppercase">Себет бош</h1><Button className="mt-6" onClick={() => router.push('/catalog')}>Каталогго өтүү</Button></div>
-  if (!user) return <div className="container-px mx-auto max-w-xl py-24 text-center"><LockKeyhole className="mx-auto size-12 text-primary" /><h1 className="mt-4 font-mono text-3xl font-bold uppercase">Заказ үчүн кириңиз</h1><p className="my-5 text-muted-foreground">Заказ тарыхын жана чекти сактоо үчүн аккаунт керек.</p><AuthDialog><Button>Кирүү же катталуу</Button></AuthDialog></div>
+  if (paid) return (
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
+      <CheckCircle2 className="size-16 text-primary animate-bounce" />
+      <h1 className="font-mono text-3xl font-bold uppercase">Заказ ийгиликтүү кабыл алынды!</h1>
+      <p className="text-muted-foreground">Электрондук чек даярдалууда жеке кабинетке багытталууда...</p>
+    </div>
+  )
+
+  if (!items.length) return (
+    <div className="container-px mx-auto max-w-3xl py-24 text-center">
+      <h1 className="font-mono text-3xl font-bold uppercase">Себет бош</h1>
+      <Button className="mt-6" onClick={() => router.push('/catalog')}>Каталогго өтүү</Button>
+    </div>
+  )
 
   return (
     <div className="container-px mx-auto max-w-6xl py-10">
@@ -76,8 +106,29 @@ export function CheckoutClient() {
         <div className="flex flex-col gap-6">
           <Section title="1. Алуучунун маалыматы">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Аты-жөнү" name="name" defaultValue={user.name} />
-              <Field label="Телефон" name="phone" defaultValue={user.phone} />
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="name">Аты-жөнү</Label>
+                <Input 
+                  id="name" 
+                  name="name" 
+                  required 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  placeholder="Атыңызды киргизиңиз" 
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="phone">Телефон</Label>
+                <Input 
+                  id="phone" 
+                  name="phone" 
+                  required 
+                  value={phone} 
+                  onChange={(e) => setPhone(e.target.value)} 
+                  placeholder="+996 ..." 
+                />
+              </div>
             </div>
             
             <div className="flex flex-col gap-2">
@@ -98,15 +149,15 @@ export function CheckoutClient() {
                 <MapPin className="size-4 text-primary" />
                 <span>Биздин башкы кеңсе / Склад: Жибек Жолу проспектиси, 234</span>
               </div>
-              <div className="relative h-[250px] w-full">
+              <div className="relative h-[220px] w-full">
                 <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2923.6334419614234!2d74.61633519999999!3d42.8858229!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x389eb7eb9875f6a9%3A0x6339009df3dc9e5f!2zMjM0INC_0YDQvtGB0L8uINCW0B3QsdC10Log0JbQvtC70YMsINCR0LjRiNC60LXQug!5e0!3m2!1sky!2skg!4v1715800000000!5m2!1sky!2skg"
-                 width="100%"
-                 height="100%"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2923.6334419614234!2d74.61633519999999!3d42.8858229!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x389eb7eb9875f6a9%3A0x6339009df3dc9e5f!2zMjM0INC_0YDQvtGB0L8uINCW0B3QsdC10Log0JbQvtC70YMsINCR0LjRiNC60LXQug!5e0!3m2!1sky!2skg!4v1715800000000!5m2!1sky!2skg"
+                  width="100%"
+                  height="100%"
                   style={{ border: 0 }}
-                 allowFullScreen={true}
-                 loading="lazy"
-                 referrerPolicy="no-referrer-when-downgrade"
+                  allowFullScreen={true}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
                 ></iframe>
               </div>
               <div className="p-3 bg-card text-center">
@@ -124,29 +175,47 @@ export function CheckoutClient() {
 
           <Section title="2. Төлөм ыкмасы">
             <div className="grid gap-3 sm:grid-cols-2">
-              <button type="button" onClick={() => setPayment('card')} className={`rounded-xl border p-4 text-left ${payment === 'card' ? 'border-primary bg-primary/5' : ''}`}>
+              <button 
+                type="button" 
+                onClick={() => setPayment('card')} 
+                className={`rounded-xl border p-4 text-left transition ${payment === 'card' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50'}`}
+              >
                 <CreditCard className="mb-3 size-5 text-primary" />
-                <b>Банк картасы</b>
+                <b className="block">Банк картасы</b>
                 <p className="text-sm text-muted-foreground">Демо онлайн төлөм</p>
               </button>
-              <button type="button" onClick={() => setPayment('cash')} className={`rounded-xl border p-4 text-left ${payment === 'cash' ? 'border-primary bg-primary/5' : ''}`}>
+
+              <button 
+                type="button" 
+                onClick={() => setPayment('cash')} 
+                className={`rounded-xl border p-4 text-left transition ${payment === 'cash' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:bg-muted/50'}`}
+              >
                 <Truck className="mb-3 size-5 text-primary" />
-                <b>Алганда төлөө</b>
+                <b className="block">Алганда төлөө</b>
                 <p className="text-sm text-muted-foreground">Накталай же QR</p>
               </button>
             </div>
+
             {payment === 'card' && (
-              <div className="grid gap-4 rounded-xl bg-secondary p-4 sm:grid-cols-2">
-                <Field label="Карта номери" name="card" placeholder="4242 4242 4242 4242" pattern="[0-9 ]{19}" />
-                <Field label="Карта ээси" name="holder" placeholder="ATY JONU" />
-                <Field label="Мөөнөтү" name="expiry" placeholder="12/29" />
-                <Field label="CVC" name="cvc" placeholder="123" pattern="[0-9]{3}" />
+              <div className="grid gap-4 rounded-xl bg-secondary/50 p-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label>Карта номери</Label>
+                  <Input placeholder="4242 4242 4242 4242" defaultValue="4242 4242 4242 4242" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>Мөөнөтү</Label>
+                  <Input placeholder="12/29" defaultValue="12/29" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Label>CVC</Label>
+                  <Input placeholder="123" defaultValue="777" type="password" maxLength={3} />
+                </div>
               </div>
             )}
           </Section>
         </div>
 
-        <aside className="h-fit rounded-2xl border bg-card p-5">
+        <aside className="h-fit rounded-2xl border bg-card p-5 sticky top-20">
           <h2 className="font-mono text-xl font-bold uppercase">Сиздин заказ</h2>
           <div className="my-5 flex flex-col gap-3">
             {items.map(i => {
@@ -163,8 +232,12 @@ export function CheckoutClient() {
             <span>Жалпы</span>
             <b className="text-primary">{formatSom(cartTotal)}</b>
           </div>
-          <Button size="lg" className="mt-5 w-full" disabled={loading}>
-            {loading ? <><Loader2 data-icon="inline-start" className="animate-spin" />Иштетилүүдө...</> : payment === 'card' ? 'Төлөө' : 'Заказ берүү'}
+          <Button type="submit" size="lg" className="mt-5 w-full font-bold" disabled={loading}>
+            {loading ? (
+              <><Loader2 className="mr-2 size-4 animate-spin" />Катталууда...</>
+            ) : (
+              'Заказ берүү'
+            )}
           </Button>
           <p className="mt-3 text-center text-xs text-muted-foreground">
             <LockKeyhole className="mr-1 inline size-3" />
@@ -178,8 +251,4 @@ export function CheckoutClient() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <section className="flex flex-col gap-5 rounded-2xl border bg-card p-5"><h2 className="font-mono text-xl font-bold uppercase">{title}</h2>{children}</section>
-}
-
-function Field({ label, name, ...props }: { label: string; name: string; [key: string]: unknown }) {
-  return <div className="flex flex-col gap-2"><Label htmlFor={name}>{label}</Label><Input id={name} name={name} required {...props} /></div>
 }
