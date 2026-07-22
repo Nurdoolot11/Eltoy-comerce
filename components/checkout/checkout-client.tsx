@@ -24,14 +24,11 @@ export function CheckoutClient() {
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
 
-  // Мурунку маалыматтарды же Auth сакталган болсо окуу
+  // Колдонуучунун маалыматтарын автоматтык түрдө жүктөө
   useEffect(() => {
     if (user) {
       setName(user.name || '')
       setPhone(user.phone || '')
-    } else {
-      setName('ELTOY Администратор')
-      setPhone('+996 700 000 001')
     }
 
     const savedAddress = localStorage.getItem('eltoy_customer_address')
@@ -44,7 +41,7 @@ export function CheckoutClient() {
     e.preventDefault()
     setLoading(true)
 
-    // Даректи кийинкиге сактап коюу
+    // Даректи сактап коюу
     localStorage.setItem('eltoy_customer_address', address)
 
     setTimeout(() => {
@@ -58,9 +55,9 @@ export function CheckoutClient() {
       const order: DemoOrder = {
         id: orderId,
         userId: user?.id || 'guest',
-        customer: name || 'ELTOY Администратор',
-        phone: phone || '+996 700 000 001',
-        address: address || 'Бишкек ш., Жибек Жолу 234',
+        customer: name || user?.name || 'Кардар',
+        phone: phone || user?.phone || '+996 700 000 000',
+        address: address || 'Бишкек ш.',
         items: orderItems,
         total: cartTotal,
         payment,
@@ -71,7 +68,7 @@ export function CheckoutClient() {
       // 1. Демо-сторго кошуу
       addOrder(order)
 
-      // 2. LocalStorage'го сактоо (Админка сөзсүз көрүшү үчүн)
+      // 2. LocalStorage'го сактоо (Админка көрүшү үчүн)
       const existingOrders = JSON.parse(localStorage.getItem('eltoy_orders') || '[]')
       localStorage.setItem('eltoy_orders', JSON.stringify([order, ...existingOrders]))
 
@@ -79,7 +76,7 @@ export function CheckoutClient() {
       setLoading(false)
       setPaid(true)
 
-      // 1.5 секунддан кийин чекти көрсөтүү же Админкага өтүү
+      // Чекке багыттоо
       setTimeout(() => router.push(`/invoice/${order.id}`), 1200)
     }, 1000)
   }
