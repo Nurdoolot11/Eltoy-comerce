@@ -8,9 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useCart } from '@/components/cart/cart-provider'
 import { useAuth } from '@/components/auth/auth-provider'
-import { addOrder, type DemoOrder } from '@/lib/demo-store'
 import { formatSom } from '@/lib/data'
-
+import { supabase } from '../../lib/supabase'
 export function CheckoutClient() {
   const router = useRouter()
   const { user } = useAuth()
@@ -37,48 +36,54 @@ export function CheckoutClient() {
     }
   }, [user])
 
-  const submit = (e: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
 
-    // Даректи сактап коюу
+    // Даректи эстеп калуу
     localStorage.setItem('eltoy_customer_address', address)
 
-    setTimeout(() => {
-      const orderId = `ES-${Date.now().toString().slice(-6)}`
-      
-      const orderItems = items.flatMap(i => {
-        const p = getProductById(i.id)
-        return p ? [{ id: p.id, name: p.name, price: p.price, quantity: i.quantity }] : []
-      })
+    const orderItems = items.flatMap(i => {
+      const p = getProductById(i.id)
+      return p ? [{ id: p.id, name: p.name, price: p.price, quantity: i.quantity }] : []
+    })
 
-      const order: DemoOrder = {
-        id: orderId,
-        userId: user?.id || 'guest',
-        customer: name || user?.name || 'Кардар',
-        phone: phone || user?.phone || '+996 700 000 000',
-        address: address || 'Бишкек ш.',
-        items: orderItems,
-        total: cartTotal,
-        payment,
-        status: 'Кабыл алынды',
-        createdAt: new Date().toISOString()
+    try {
+      // Supabase маалымат базасына заказды киргизүү
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([
+          {
+            customer_name: name || user?.name || 'Кардар',
+            phone: phone || user?.phone || '+996 700 000 000',
+            address: address || 'Бишкек ш.',
+            items: orderItems,
+            total: cartTotal,
+            status: 'Кабыл алынды',
+          },
+        ])
+        .select()
+
+      if (error) {
+        console.error('Supabase катасы:', error)
+        alert('Заказды сактоодо ката чыкты: ' + error.message)
+        setLoading(false)
+        return
       }
 
-      // 1. Демо-сторго кошуу
-      addOrder(order)
-
-      // 2. LocalStorage'го сактоо (Админка көрүшү үчүн)
-      const existingOrders = JSON.parse(localStorage.getItem('eltoy_orders') || '[]')
-      localStorage.setItem('eltoy_orders', JSON.stringify([order, ...existingOrders]))
+      const createdOrder = data[0]
 
       clearCart()
       setLoading(false)
       setPaid(true)
 
       // Чекке багыттоо
-      setTimeout(() => router.push(`/invoice/${order.id}`), 1200)
-    }, 1000)
+      setTimeout(() => router.push(`/invoice/${createdOrder.id}`), 1200)
+    } catch (err) {
+      console.error('Ката:', err)
+      alert('Заказ берүүдө ката кетти')
+      setLoading(false)
+    }
   }
 
   if (paid) return (
