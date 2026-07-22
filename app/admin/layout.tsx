@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   Package,
@@ -12,6 +12,8 @@ import {
   LogOut,
   Store,
   ShieldCheck,
+  Menu,
+  X,
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { Button } from '@/components/ui/button'
@@ -28,15 +30,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, ready, logout } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     if (ready) {
-      // Эгер кирбеген болсо же ролу 'admin' болбосо, кадимки сайтка кайтарат
       if (!user || user.role !== 'admin') {
         router.push('/')
       }
     }
   }, [user, ready, router])
+
+  // Барак которулганда мобилдик менюну автоматтык түрдө жабуу
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [pathname])
 
   if (!ready || !user || user.role !== 'admin') {
     return (
@@ -47,11 +54,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex min-h-screen bg-muted/20">
-      {/* СОЛ ЖАКТАГЫ АДМИН МЕНЮ (SIDEBAR) */}
-      <aside className="fixed inset-y-0 left-0 z-50 w-64 border-r bg-card p-4 flex flex-col justify-between">
+    <div className="flex min-h-screen bg-muted/25 relative">
+      {/* МОБИЛДИК ЖОГОРКУ ШАПКА (Телефондор үчүн гана көрүнөт) */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card border-b z-40 flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-primary p-1.5 text-primary-foreground">
+            <ShieldCheck className="size-5" />
+          </div>
+          <span className="font-mono font-bold uppercase tracking-wider text-sm">ELTOY ADMIN</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label="Менюну ачуу"
+        >
+          {mobileMenuOpen ? <X className="size-6" /> : <Menu className="size-6" />}
+        </Button>
+      </div>
+
+      {/* КАПТАЛДАГЫ МЕНЮ (SIDEBAR) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 border-r bg-card p-4 flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${
+          mobileMenuOpen ? 'translate-x-0 pt-20 lg:pt-4' : '-translate-x-full'
+        }`}
+      >
         <div className="space-y-6">
-          <div className="flex items-center gap-2 px-2 border-b pb-4">
+          <div className="hidden lg:flex items-center gap-2 px-2 border-b pb-4">
             <div className="rounded-xl bg-primary p-2 text-primary-foreground">
               <ShieldCheck className="size-6" />
             </div>
@@ -85,12 +114,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* АЛДЫҢКЫ БӨЛҮК: САЙТКА КАЙТУУ ЖАНА ЧЫГУУ */}
         <div className="border-t pt-4 space-y-2">
-         <Link href="/" className="w-full">
-  <Button variant="outline" className="w-full justify-start gap-2 rounded-xl text-xs">
-    <Store className="size-4" />
-    Дүкөнгө өтүү (Сайт)
-  </Button>
-</Link>
+          <Link href="/" className="w-full">
+            <Button variant="outline" className="w-full justify-start gap-2 rounded-xl text-xs">
+              <Store className="size-4" />
+              Дүкөнгө өтүү (Сайт)
+            </Button>
+          </Link>
           <Button
             variant="ghost"
             className="w-full justify-start gap-2 rounded-xl text-xs text-destructive hover:bg-destructive/10"
@@ -102,9 +131,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* ОҢ ЖАКТАГЫ НЕГИЗГИ АРАМЕК ЖУМУШЧУ ТАЛАА */}
-      <main className="pl-64 flex-1">
-        <div className="p-8 max-w-7xl mx-auto">
+      {/* МОБИЛДИК ФОНДУ КАРАҢГАТУУ (Меню ачык турганда сыртка басса жабылышы үчүн) */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* ОҢ ЖАКТАГЫ НЕГИЗГИ ЖУМУШЧУ ТАЛАА */}
+      <main className="flex-1 lg:pl-64 w-full pt-16 lg:pt-0">
+        <div className="p-4 sm:p-8 max-w-7xl mx-auto">
           {children}
         </div>
       </main>
