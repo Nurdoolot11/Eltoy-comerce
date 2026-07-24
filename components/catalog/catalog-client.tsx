@@ -12,14 +12,14 @@ import { supabase } from '@/lib/supabase'
 
 export function CatalogClient() {
   const params = useSearchParams()
-  const initialFilter = params?.get('filter') || ''
+  const initialFilter = params ? params.get('filter') || '' : ''
 
   const [dbProducts, setDbProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [query, setQuery] = useState(params?.get('q') || '')
-  const [category, setCategory] = useState(params?.get('category') || 'all')
-  const [brand, setBrand] = useState(params?.get('brand') || 'all')
+  const [query, setQuery] = useState(params ? params.get('q') || '' : '')
+  const [category, setCategory] = useState(params ? params.get('category') || 'all' : 'all')
+  const [brand, setBrand] = useState(params ? params.get('brand') || 'all' : 'all')
   const [sort, setSort] = useState('featured')
   const [available, setAvailable] = useState(false)
 
@@ -50,8 +50,9 @@ export function CatalogClient() {
 
   // Фильтрация жана сорттоо
   const filtered = useMemo(() => {
-    return dbProducts
+    return (dbProducts || [])
       .filter((p) => {
+        if (!p) return false
         const title = p.title || p.name || ''
         const desc = p.description || p.shortDescription || ''
         const text = `${title} ${desc}`.toLowerCase()
@@ -62,23 +63,23 @@ export function CatalogClient() {
         const badges = Array.isArray(p.badges) ? p.badges : []
         const matchesInitialFilter = !initialFilter || badges.includes(initialFilter)
 
-        const isStockAvailable = p.in_stock !== undefined ? p.in_stock : ((p.stock || 0) > 0)
+        const isStockAvailable = p.in_stock !== undefined ? Boolean(p.in_stock) : Number(p.stock || 0) > 0
         const matchesStock = !available || isStockAvailable
 
         return matchesQuery && matchesCategory && matchesBrand && matchesInitialFilter && matchesStock
       })
       .sort((a, b) => {
-        const priceA = Number(a.price) || 0
-        const priceB = Number(b.price) || 0
-        const ratingA = Number(a.rating) || 0
-        const ratingB = Number(b.rating) || 0
+        const priceA = Number(a?.price) || 0
+        const priceB = Number(b?.price) || 0
+        const ratingA = Number(a?.rating) || 0
+        const ratingB = Number(b?.rating) || 0
 
         if (sort === 'price-up') return priceA - priceB
         if (sort === 'price-down') return priceB - priceA
         if (sort === 'rating') return ratingB - ratingA
 
-        const badgesA = Array.isArray(a.badges) ? a.badges : []
-        const badgesB = Array.isArray(b.badges) ? b.badges : []
+        const badgesA = Array.isArray(a?.badges) ? a.badges : []
+        const badgesB = Array.isArray(b?.badges) ? b.badges : []
         return Number(badgesB.includes('featured')) - Number(badgesA.includes('featured'))
       })
   }, [dbProducts, query, category, brand, sort, available, initialFilter])
@@ -132,7 +133,7 @@ export function CatalogClient() {
             <SelectGroup>
               <SelectItem value="all">Бардык бренд</SelectItem>
               {(brands || []).map((b) => (
-               <SelectItem key={b.slug || b.name} value={b.slug || b.name}>
+                <SelectItem key={b.slug || b.name} value={b.slug || b.name}>
                   {b.name}
                 </SelectItem>
               ))}
@@ -174,19 +175,27 @@ export function CatalogClient() {
         <div className="py-20 text-center text-muted-foreground">Каталог жүктөлүүдө...</div>
       ) : filtered.length ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
-          {filtered.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={{
-                ...p,
-                title: p.title || p.name || 'Аталышы жок',
-                price: Number(p.price) || 0,
-                image: p.image_url || p.image || (Array.isArray(p.images) ? p.images[0] : '/placeholder.jpg'),
-                category: p.category || 'Курулуш материалдары',
-                inStock: p.in_stock ?? true,
-              }}
-            />
-          ))}
+          {filtered.map((p) => {
+            const safeImage = p.image_url || p.image || (Array.isArray(p.images) ? p.images[0] : '/placeholder.jpg')
+            const safeProduct = {
+              ...p,
+              id: p.id,
+              title: p.title || p.name || 'Аталышы жок',
+              name: p.name || p.title || 'Аталышы жок',
+              price: Number(p.price) || 0,
+              image: safeImage,
+              image_url: safeImage,
+              images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [safeImage],
+              category: p.category || 'Курулуш материалдары',
+              brand: p.brand || 'ELTOY',
+              inStock: p.in_stock ?? true,
+              in_stock: p.in_stock ?? true,
+              rating: Number(p.rating) || 5,
+              badges: Array.isArray(p.badges) ? p.badges : [],
+            }
+
+            return <ProductCard key={p.id} product={safeProduct} />
+          })}
         </div>
       ) : (
         <div className="rounded-2xl border bg-card py-20 text-center">
