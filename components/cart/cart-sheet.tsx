@@ -45,39 +45,54 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
         ) : (
           <>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              {items.map((item) => {
-                const p = getProductById(item.id)
+              {items.map((cartItem: any) => {
+                const fetchedP = getProductById(cartItem.id)
+                const p = fetchedP || cartItem.product || cartItem
+
                 if (!p) return null
+
+                const safeImage =
+                  p.image ||
+                  p.image_url ||
+                  (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null) ||
+                  '/placeholder.svg'
+
+                const safeName = p.name || p.title || 'Товар'
+                const safePrice = Number(p.price) || 0
+                const safeSlug = p.slug || p.id || ''
+
                 return (
-                  <div key={item.id} className="flex gap-3 rounded-xl border border-border bg-card p-3">
-                    <Image
-                      src={p.image || '/placeholder.svg'}
-                      alt={p.name}
-                      width={72}
-                      height={72}
-                      className="size-18 shrink-0 rounded-lg bg-secondary object-contain p-1"
-                    />
+                  <div key={cartItem.id} className="flex gap-3 rounded-xl border border-border bg-card p-3">
+                    <div className="relative size-18 shrink-0 overflow-hidden rounded-lg bg-secondary p-1">
+                      <Image
+                        src={safeImage}
+                        alt={safeName}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                    </div>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <Link
-                        href={`/product/${p.slug}`}
+                        href={`/product/${safeSlug}`}
                         onClick={() => setOpen(false)}
                         className="line-clamp-2 text-sm font-medium hover:text-primary"
                       >
-                        {p.name}
+                        {safeName}
                       </Link>
-                      <span className="mt-0.5 text-sm font-bold text-primary">{formatSom(p.price)}</span>
+                      <span className="mt-0.5 text-sm font-bold text-primary">{formatSom(safePrice)}</span>
                       <div className="mt-auto flex items-center justify-between pt-2">
                         <div className="flex items-center gap-2 rounded-full border border-border">
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
                             className="grid size-7 place-items-center rounded-full hover:bg-accent"
                             aria-label="Азайтуу"
                           >
                             <Minus className="size-3.5" />
                           </button>
-                          <span className="w-5 text-center text-sm font-medium">{item.quantity}</span>
+                          <span className="w-5 text-center text-sm font-medium">{cartItem.quantity}</span>
                           <button
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
                             className="grid size-7 place-items-center rounded-full hover:bg-accent"
                             aria-label="Көбөйтүү"
                           >
@@ -85,7 +100,7 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
                           </button>
                         </div>
                         <button
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeFromCart(cartItem.id)}
                           className="text-muted-foreground hover:text-destructive"
                           aria-label="Өчүрүү"
                         >
