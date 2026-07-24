@@ -7,7 +7,7 @@ import { ProductCard } from '@/components/product/product-card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { brands, categories } from '@/lib/data'
+import { brands, categories, products as staticProducts } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 
 export function CatalogClient() {
@@ -48,9 +48,18 @@ export function CatalogClient() {
     fetchProducts()
   }, [])
 
+  // Supabase товарлары менен статиктик товарларды бириктирүү
+  const allProducts = useMemo(() => {
+    const localFormatted = (staticProducts || []).map((p) => ({
+      ...p,
+      isLocal: true,
+    }))
+    return [...dbProducts, ...localFormatted]
+  }, [dbProducts])
+
   // Фильтрация жана сорттоо
   const filtered = useMemo(() => {
-    return (dbProducts || [])
+    return allProducts
       .filter((p) => {
         if (!p) return false
         const title = p.title || p.name || ''
@@ -59,7 +68,6 @@ export function CatalogClient() {
 
         const matchesQuery = !query || text.includes(query.toLowerCase())
         
-        // Ийчил категория жана бренд салыштыруу
         const pCat = (p.category || '').toLowerCase()
         const pBrand = (p.brand || '').toLowerCase()
         const matchesCategory = category === 'all' || pCat.includes(category.toLowerCase()) || category.toLowerCase().includes(pCat)
@@ -87,7 +95,7 @@ export function CatalogClient() {
         const badgesB = Array.isArray(b?.badges) ? b.badges : []
         return Number(badgesB.includes('featured')) - Number(badgesA.includes('featured'))
       })
-  }, [dbProducts, query, category, brand, sort, available, initialFilter])
+  }, [allProducts, query, category, brand, sort, available, initialFilter])
 
   const reset = () => {
     setQuery('')
@@ -180,8 +188,7 @@ export function CatalogClient() {
         <div className="py-20 text-center text-muted-foreground">Каталог жүктөлүүдө...</div>
       ) : filtered.length ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
-          {filtered.map((p) => {
-            // ЭҢ БИРИНЧИ images массивин текшеребиз:
+          {filtered.map((p, idx) => {
             const safeImage =
               (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null) ||
               p.image_url ||
@@ -190,7 +197,7 @@ export function CatalogClient() {
 
             const safeProduct = {
               ...p,
-              id: p.id,
+              id: p.id || `static-${idx}`,
               title: p.title || p.name || 'Аталышы жок',
               name: p.name || p.title || 'Аталышы жок',
               price: Number(p.price) || 0,
@@ -205,7 +212,7 @@ export function CatalogClient() {
               badges: Array.isArray(p.badges) ? p.badges : [],
             }
 
-            return <ProductCard key={p.id} product={safeProduct} />
+            return <ProductCard key={safeProduct.id} product={safeProduct} />
           })}
         </div>
       ) : (
