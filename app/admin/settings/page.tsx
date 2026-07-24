@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Save, Store, Phone, MapPin, Clock, Truck, Upload, Image as ImageIcon } from 'lucide-react'
+import { Settings, Save, Store, Phone, MapPin, Clock, Truck, Upload, Image as ImageIcon, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase'
 
 export default function AdminSettingsPage() {
   const [siteName, setSiteName] = useState('ELTOY STROY')
@@ -12,22 +13,42 @@ export default function AdminSettingsPage() {
   const [address, setAddress] = useState('Бишкек ш., Лев Толстой көч. 21')
   const [hours, setHours] = useState('Пн-Сб: 08:00 - 18:00')
   const [shippingFee, setShippingFee] = useState('300')
+  
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
+  // Supabase'тен настройкаларды жүктөө
   useEffect(() => {
-    const saved = localStorage.getItem('eltoy_settings')
-    if (saved) {
-      const data = JSON.parse(saved)
-      setSiteName(data.siteName || 'ELTOY STROY')
-      setLogoUrl(data.logoUrl || '/logo.png')
-      setPhone(data.phone || '+996 555 123 456')
-      setAddress(data.address || 'Бишкек ш., Лев Толстой көч. 21')
-      setHours(data.hours || 'Пн-Сб: 08:00 - 18:00')
-      setShippingFee(data.shippingFee || '300')
+    async function fetchSettings() {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', 1)
+          .single()
+
+        if (data) {
+          setSiteName(data.site_name || 'ELTOY STROY')
+          setLogoUrl(data.logo_url || '/logo.png')
+          setPhone(data.phone || '+996 555 123 456')
+          setAddress(data.address || 'Бишкек ш., Лев Толстой көч. 21')
+          setHours(data.hours || 'Пн-Сб: 08:00 - 18:00')
+          setShippingFee(data.shipping_fee || '300')
+        }
+      } catch (err) {
+        console.error('Ката чыкты:', err)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchSettings()
   }, [])
 
-  // ГАЛЕРЕЯДАН СҮРӨТ ТАНДОО БӨЛҮГҮ
+  // Сүрөттү (Логотип) Галереядан тандоо
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -39,13 +60,43 @@ export default function AdminSettingsPage() {
     }
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  // Supabase'ке сактоо
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    const settingsData = { siteName, logoUrl, phone, address, hours, shippingFee }
-    localStorage.setItem('eltoy_settings', JSON.stringify(settingsData))
-    
-    setSavedSuccess(true)
-    setTimeout(() => setSavedSuccess(false), 3000)
+    setSaving(true)
+    setErrorMessage('')
+
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({
+          id: 1,
+          site_name: siteName,
+          logo_url: logoUrl,
+          phone: phone,
+          address: address,
+          hours: hours,
+          shipping_fee: shippingFee,
+        })
+
+      if (error) throw error
+
+      setSavedSuccess(true)
+      setTimeout(() => setSavedSuccess(false), 3000)
+    } catch (err: any) {
+      console.error('Сактоодо ката:', err)
+      setErrorMessage('Сактоодо ката чыкты, кайра аракет кылып көрүңүз.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -59,12 +110,18 @@ export default function AdminSettingsPage() {
 
       {savedSuccess && (
         <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-emerald-600 font-medium text-sm">
-          ✓ Настройкалар ийгиликтүү сакталды!
+          ✓ Өзгөртүүлөр Supabase базасына ийгиликтүү сакталды!
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-4 text-destructive font-medium text-sm">
+          {errorMessage}
         </div>
       )}
 
       <form onSubmit={handleSave} className="space-y-6">
-        {/* ДҮКӨН ММАЛЫМАТТАРЫ ЖАНА ЛОГОТИП */}
+        {/* ДҮКӨН МААЛЫМАТТАРЫ ЖАНА ЛОГОТИП */}
         <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
           <h2 className="font-bold text-lg border-b pb-2 flex items-center gap-2">
             <Store className="size-5 text-primary" />
@@ -94,11 +151,10 @@ export default function AdminSettingsPage() {
               </div>
             </div>
 
-            {/* ЛОГОТИПТИ ГАЛЕРЕЯДАН ЖҮКТӨӨ */}
+            {/* ЛОГОТИП */}
             <div className="sm:col-span-2 space-y-2">
               <label className="text-xs font-semibold text-muted-foreground">Сайттын Логотиби</label>
               <div className="flex items-center gap-4">
-                {/* Логотиптин алдын ала көрүнүшү (Preview) */}
                 <div className="size-16 rounded-2xl border bg-muted flex items-center justify-center overflow-hidden shrink-0">
                   {logoUrl ? (
                     <img src={logoUrl} alt="Logo" className="size-full object-contain p-2" />
@@ -171,10 +227,20 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
+        {/* Сактоо баскычы */}
         <div className="flex justify-end">
-          <Button type="submit" size="lg" className="rounded-xl gap-2 px-8">
-            <Save className="size-4" />
-            Өзгөртүүлөрдү сактоо
+          <Button type="submit" size="lg" disabled={saving} className="rounded-xl gap-2 px-8">
+            {saving ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Сакталууда...
+              </>
+            ) : (
+              <>
+                <Save className="size-4" />
+                Өзгөртүүлөрдү сактоо
+              </>
+            )}
           </Button>
         </div>
       </form>
