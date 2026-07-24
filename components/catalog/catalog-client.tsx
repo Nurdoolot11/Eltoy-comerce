@@ -12,14 +12,14 @@ import { supabase } from '@/lib/supabase'
 
 export function CatalogClient() {
   const params = useSearchParams()
-  const initialFilter = params.get('filter') || ''
+  const initialFilter = params?.get('filter') || ''
 
   const [dbProducts, setDbProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [query, setQuery] = useState(params.get('q') || '')
-  const [category, setCategory] = useState(params.get('category') || 'all')
-  const [brand, setBrand] = useState(params.get('brand') || 'all')
+  const [query, setQuery] = useState(params?.get('q') || '')
+  const [category, setCategory] = useState(params?.get('category') || 'all')
+  const [brand, setBrand] = useState(params?.get('brand') || 'all')
   const [sort, setSort] = useState('featured')
   const [available, setAvailable] = useState(false)
 
@@ -59,10 +59,10 @@ export function CatalogClient() {
         const matchesQuery = !query || text.includes(query.toLowerCase())
         const matchesCategory = category === 'all' || p.category === category
         const matchesBrand = brand === 'all' || p.brand === brand
-        const badges = p.badges || []
+        const badges = Array.isArray(p.badges) ? p.badges : []
         const matchesInitialFilter = !initialFilter || badges.includes(initialFilter)
 
-        const isStockAvailable = p.in_stock !== undefined ? p.in_stock : (p.stock > 0)
+        const isStockAvailable = p.in_stock !== undefined ? p.in_stock : ((p.stock || 0) > 0)
         const matchesStock = !available || isStockAvailable
 
         return matchesQuery && matchesCategory && matchesBrand && matchesInitialFilter && matchesStock
@@ -77,8 +77,8 @@ export function CatalogClient() {
         if (sort === 'price-down') return priceB - priceA
         if (sort === 'rating') return ratingB - ratingA
 
-        const badgesA = a.badges || []
-        const badgesB = b.badges || []
+        const badgesA = Array.isArray(a.badges) ? a.badges : []
+        const badgesB = Array.isArray(b.badges) ? b.badges : []
         return Number(badgesB.includes('featured')) - Number(badgesA.includes('featured'))
       })
   }, [dbProducts, query, category, brand, sort, available, initialFilter])
@@ -107,15 +107,15 @@ export function CatalogClient() {
         </div>
 
         {/* Категория таңдоо */}
-        <Select value={category} onValueChange={(val) => val && setCategory(val)}>
+        <Select value={category} onValueChange={(val) => setCategory(val || 'all')}>
           <SelectTrigger className="lg:w-52">
             <SelectValue placeholder="Категория" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
               <SelectItem value="all">Бардык категория</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.slug} value={c.slug}>
+              {(categories || []).map((c) => (
+                <SelectItem key={c.slug || c.name} value={c.slug || c.name}>
                   {c.name}
                 </SelectItem>
               ))}
@@ -124,15 +124,15 @@ export function CatalogClient() {
         </Select>
 
         {/* Бренд таңдоо */}
-        <Select value={brand} onValueChange={(val) => val && setBrand(val)}>
+        <Select value={brand} onValueChange={(val) => setBrand(val || 'all')}>
           <SelectTrigger className="lg:w-44">
             <SelectValue placeholder="Бренд" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
               <SelectItem value="all">Бардык бренд</SelectItem>
-              {brands.map((b) => (
-                <SelectItem key={b.slug} value={b.slug}>
+              {(brands || []).map((b) => (
+               <SelectItem key={b.slug || b.name} value={b.slug || b.name}>
                   {b.name}
                 </SelectItem>
               ))}
@@ -141,7 +141,7 @@ export function CatalogClient() {
         </Select>
 
         {/* Сорттоо */}
-        <Select value={sort} onValueChange={(val) => val && setSort(val)}>
+        <Select value={sort} onValueChange={(val) => setSort(val || 'featured')}>
           <SelectTrigger className="lg:w-48">
             <SelectValue />
           </SelectTrigger>
@@ -156,7 +156,7 @@ export function CatalogClient() {
         </Select>
 
         <Button variant={available ? 'default' : 'outline'} onClick={() => setAvailable(!available)}>
-          <SlidersHorizontal data-icon="inline-start" />
+          <SlidersHorizontal className="mr-2 size-4" />
           Складда
         </Button>
         <Button variant="ghost" size="icon" onClick={reset} aria-label="Фильтрди тазалоо">
@@ -175,7 +175,17 @@ export function CatalogClient() {
       ) : filtered.length ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
           {filtered.map((p) => (
-            <ProductCard key={p.id} product={p} />
+            <ProductCard
+              key={p.id}
+              product={{
+                ...p,
+                title: p.title || p.name || 'Аталышы жок',
+                price: Number(p.price) || 0,
+                image: p.image_url || p.image || (Array.isArray(p.images) ? p.images[0] : '/placeholder.jpg'),
+                category: p.category || 'Курулуш материалдары',
+                inStock: p.in_stock ?? true,
+              }}
+            />
           ))}
         </div>
       ) : (
