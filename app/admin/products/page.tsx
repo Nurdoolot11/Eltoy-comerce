@@ -102,7 +102,7 @@ export default function AdminProductsPage() {
     setNewImages(newImages.filter((_, i) => i !== index))
   }
 
-  // Жаңы товарды сактоо
+  // Жаңы товарды сактоо (Ката ушул жерден оңдолду)
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPrice) return
@@ -116,11 +116,9 @@ export default function AdminProductsPage() {
         .insert([
           {
             name: newTitle,
-            title: newTitle,
             price: Number(newPrice),
             category: newCategory,
             image_url: imagesToSave[0],
-            image: imagesToSave[0],
             images: imagesToSave,
             description: newDesc,
             in_stock: true,
@@ -328,7 +326,7 @@ export default function AdminProductsPage() {
             </thead>
             <tbody className="divide-y">
               {filteredProducts.map((product) => {
-                const imgSource = product.image || product.image_url || product.images?.[0]
+                const imgSource = product.image_url || product.image || product.images?.[0]
                 return (
                   <tr key={product.id} className="hover:bg-muted/20 transition">
                     <td className="p-4">
