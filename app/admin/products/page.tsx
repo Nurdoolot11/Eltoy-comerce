@@ -102,7 +102,7 @@ export default function AdminProductsPage() {
     setNewImages(newImages.filter((_, i) => i !== index))
   }
 
-  // Жаңы товарды сактоо (Ката ушул жерден оңдолду)
+  // Жаңы товарды сактоо (Оңдолгон)
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPrice) return
@@ -119,7 +119,6 @@ export default function AdminProductsPage() {
             price: Number(newPrice),
             category: newCategory,
             image_url: imagesToSave[0],
-            images: imagesToSave,
             description: newDesc,
             in_stock: true,
           },
@@ -335,11 +334,6 @@ export default function AdminProductsPage() {
                           <img src={imgSource} alt={product.title || product.name || 'Товар'} className="size-full object-cover" />
                         ) : (
                           <ImageIcon className="size-5 text-muted-foreground" />
-                        )}
-                        {product.images?.length > 1 && (
-                          <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] px-1 rounded-tl-md font-bold">
-                            +{product.images.length}
-                          </span>
                         )}
                       </div>
                     </td>
