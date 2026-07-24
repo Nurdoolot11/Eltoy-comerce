@@ -58,8 +58,13 @@ export function CatalogClient() {
         const text = `${title} ${desc}`.toLowerCase()
 
         const matchesQuery = !query || text.includes(query.toLowerCase())
-        const matchesCategory = category === 'all' || p.category === category
-        const matchesBrand = brand === 'all' || p.brand === brand
+        
+        // Ийчил категория жана бренд салыштыруу
+        const pCat = (p.category || '').toLowerCase()
+        const pBrand = (p.brand || '').toLowerCase()
+        const matchesCategory = category === 'all' || pCat.includes(category.toLowerCase()) || category.toLowerCase().includes(pCat)
+        const matchesBrand = brand === 'all' || pBrand.includes(brand.toLowerCase()) || brand.toLowerCase().includes(pBrand)
+
         const badges = Array.isArray(p.badges) ? p.badges : []
         const matchesInitialFilter = !initialFilter || badges.includes(initialFilter)
 
@@ -176,7 +181,13 @@ export function CatalogClient() {
       ) : filtered.length ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
           {filtered.map((p) => {
-            const safeImage = p.image_url || p.image || (Array.isArray(p.images) ? p.images[0] : '/placeholder.jpg')
+            // ЭҢ БИРИНЧИ images массивин текшеребиз:
+            const safeImage =
+              (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null) ||
+              p.image_url ||
+              p.image ||
+              '/placeholder.jpg'
+
             const safeProduct = {
               ...p,
               id: p.id,
@@ -186,7 +197,7 @@ export function CatalogClient() {
               image: safeImage,
               image_url: safeImage,
               images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [safeImage],
-              category: p.category || 'Курулуш материалдары',
+              category: p.category || 'Жалпы',
               brand: p.brand || 'ELTOY',
               inStock: p.in_stock ?? true,
               in_stock: p.in_stock ?? true,
