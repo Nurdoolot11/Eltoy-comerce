@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { ProductCard } from '@/components/product/product-card'
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { brands, categories, products as staticProducts } from '@/lib/data'
 import { supabase } from '@/lib/supabase'
 
-export function CatalogClient() {
+function CatalogContent() {
   const params = useSearchParams()
   const initialFilter = params ? params.get('filter') || '' : ''
 
@@ -33,13 +33,11 @@ export function CatalogClient() {
           .select('*')
           .order('created_at', { ascending: false })
 
-        if (error) {
-          console.error('Товарларды алууда ката:', error.message)
-        } else if (data) {
+        if (!error && data) {
           setDbProducts(data)
         }
       } catch (err) {
-        console.error('Сервер катасы:', err)
+        console.error('Fetch error:', err)
       } finally {
         setLoading(false)
       }
@@ -48,34 +46,68 @@ export function CatalogClient() {
     fetchProducts()
   }, [])
 
-  // Supabase товарлары менен статиктик товарларды бириктирүү
+  // Базадагы жана мок товарларды бириктирүү
   const allProducts = useMemo(() => {
-    const localFormatted = (staticProducts || []).map((p) => ({
-      ...p,
-      isLocal: true,
-    }))
-    return [...dbProducts, ...localFormatted]
+    const dbList = dbProducts || []
+    const staticList = staticProducts || []
+    return [...dbList, ...staticList]
   }, [dbProducts])
 
-  // Фильтрация жана сорттоо
+  // Универсалдуу фильтрация
   const filtered = useMemo(() => {
     return allProducts
       .filter((p) => {
         if (!p) return false
-        const title = p.title || p.name || ''
-        const desc = p.description || p.shortDescription || ''
+
+        // 1. Издөө текшерүүсү
+        const title = String(p.title || p.name || '')
+        const desc = String(p.description || p.shortDescription || '')
         const text = `${title} ${desc}`.toLowerCase()
-
         const matchesQuery = !query || text.includes(query.toLowerCase())
-        
-        const pCat = (p.category || '').toLowerCase()
-        const pBrand = (p.brand || '').toLowerCase()
-        const matchesCategory = category === 'all' || pCat.includes(category.toLowerCase()) || category.toLowerCase().includes(pCat)
-        const matchesBrand = brand === 'all' || pBrand.includes(brand.toLowerCase()) || brand.toLowerCase().includes(pBrand)
 
+        // 2. Категорияны акылдуу текшерүү (Slug, Name, ID боюнча)
+        let matchesCategory = true
+        if (category && category !== 'all') {
+          const selectedCatObj = categories.find(
+            (c) => c.slug === category || c.name.toLowerCase() === category.toLowerCase()
+          )
+          
+          const pCat = String(p.category || '').toLowerCase()
+          const catSlug = selectedCatObj ? selectedCatObj.slug.toLowerCase() : category.toLowerCase()
+          const catName = selectedCatObj ? selectedCatObj.name.toLowerCase() : category.toLowerCase()
+
+          matchesCategory =
+            pCat === catSlug ||
+            pCat === catName ||
+            pCat.includes(catSlug) ||
+            pCat.includes(catName) ||
+            catSlug.includes(pCat) ||
+            catName.includes(pCat)
+        }
+
+        // 3. Брендди акылдуу текшерүү
+        let matchesBrand = true
+        if (brand && brand !== 'all') {
+          const selectedBrandObj = brands.find(
+            (b) => b.slug === brand || b.name.toLowerCase() === brand.toLowerCase()
+          )
+
+          const pBrand = String(p.brand || '').toLowerCase()
+          const brandSlug = selectedBrandObj ? selectedBrandObj.slug.toLowerCase() : brand.toLowerCase()
+          const brandName = selectedBrandObj ? selectedBrandObj.name.toLowerCase() : brand.toLowerCase()
+
+          matchesBrand =
+            pBrand === brandSlug ||
+            pBrand === brandName ||
+            pBrand.includes(brandSlug) ||
+            pBrand.includes(brandName)
+        }
+
+        // 4. Дополнительный фильтр
         const badges = Array.isArray(p.badges) ? p.badges : []
         const matchesInitialFilter = !initialFilter || badges.includes(initialFilter)
 
+        // 5. Складда бардыгын текшерүү
         const isStockAvailable = p.in_stock !== undefined ? Boolean(p.in_stock) : Number(p.stock || 0) > 0
         const matchesStock = !available || isStockAvailable
 
@@ -84,16 +116,9 @@ export function CatalogClient() {
       .sort((a, b) => {
         const priceA = Number(a?.price) || 0
         const priceB = Number(b?.price) || 0
-        const ratingA = Number(a?.rating) || 0
-        const ratingB = Number(b?.rating) || 0
-
         if (sort === 'price-up') return priceA - priceB
         if (sort === 'price-down') return priceB - priceA
-        if (sort === 'rating') return ratingB - ratingA
-
-        const badgesA = Array.isArray(a?.badges) ? a.badges : []
-        const badgesB = Array.isArray(b?.badges) ? b.badges : []
-        return Number(badgesB.includes('featured')) - Number(badgesA.includes('featured'))
+        return 0
       })
   }, [allProducts, query, category, brand, sort, available, initialFilter])
 
@@ -120,7 +145,7 @@ export function CatalogClient() {
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Товар издөө..." className="pl-10" />
         </div>
 
-        {/* Категория таңдоо */}
+        {/* Категория */}
         <Select value={category} onValueChange={(val) => setCategory(val || 'all')}>
           <SelectTrigger className="lg:w-52">
             <SelectValue placeholder="Категория" />
@@ -129,7 +154,7 @@ export function CatalogClient() {
             <SelectGroup>
               <SelectItem value="all">Бардык категория</SelectItem>
               {(categories || []).map((c) => (
-                <SelectItem key={c.slug || c.name} value={c.slug || c.name}>
+                <SelectItem key={c.slug || c.name} value={c.slug}>
                   {c.name}
                 </SelectItem>
               ))}
@@ -137,7 +162,7 @@ export function CatalogClient() {
           </SelectContent>
         </Select>
 
-        {/* Бренд таңдоо */}
+        {/* Бренд */}
         <Select value={brand} onValueChange={(val) => setBrand(val || 'all')}>
           <SelectTrigger className="lg:w-44">
             <SelectValue placeholder="Бренд" />
@@ -146,7 +171,7 @@ export function CatalogClient() {
             <SelectGroup>
               <SelectItem value="all">Бардык бренд</SelectItem>
               {(brands || []).map((b) => (
-                <SelectItem key={b.slug || b.name} value={b.slug || b.name}>
+                <SelectItem key={b.slug || b.name} value={b.slug}>
                   {b.name}
                 </SelectItem>
               ))}
@@ -164,7 +189,6 @@ export function CatalogClient() {
               <SelectItem value="featured">Сунушталган</SelectItem>
               <SelectItem value="price-up">Баасы: төмөн</SelectItem>
               <SelectItem value="price-down">Баасы: жогору</SelectItem>
-              <SelectItem value="rating">Рейтинг</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -189,17 +213,14 @@ export function CatalogClient() {
       ) : filtered.length ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 lg:gap-5">
           {filtered.map((p, idx) => {
-            const safeImage =
-              (Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null) ||
-              p.image_url ||
-              p.image ||
-              '/placeholder.jpg'
+            const imgFromArr = Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null
+            const safeImage = imgFromArr || p.image_url || p.image || '/placeholder.jpg'
 
             const safeProduct = {
               ...p,
-              id: p.id || `static-${idx}`,
-              title: p.title || p.name || 'Аталышы жок',
-              name: p.name || p.title || 'Аталышы жок',
+              id: p.id || `product-${idx}`,
+              title: p.title || p.name || 'Товар',
+              name: p.name || p.title || 'Товар',
               price: Number(p.price) || 0,
               image: safeImage,
               image_url: safeImage,
@@ -224,5 +245,13 @@ export function CatalogClient() {
         </div>
       )}
     </div>
+  )
+}
+
+export function CatalogClient() {
+  return (
+    <Suspense fallback={<div className="py-20 text-center">Жүктөлүүдө...</div>}>
+      <CatalogContent />
+    </Suspense>
   )
 }
