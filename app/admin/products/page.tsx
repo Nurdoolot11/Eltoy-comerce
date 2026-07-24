@@ -4,39 +4,50 @@ import { useState, useEffect } from 'react'
 import { Package, Plus, Trash2, Search, Image as ImageIcon, X, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatSom, products as initialProducts } from '@/lib/data'
+import { formatSom } from '@/lib/data'
+import { supabase } from '@/lib/supabase'
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   // Форма үчүн стейттер
   const [newTitle, setNewTitle] = useState('')
   const [newPrice, setNewPrice] = useState('')
-  const [newCategory, setNewCategory] = useState('Строительные материалы')
+  const [newCategory, setNewCategory] = useState('Курулуш материалдары')
   const [newImages, setNewImages] = useState<string[]>([])
   const [imageUrlInput, setImageUrlInput] = useState('')
   const [newDesc, setNewDesc] = useState('')
 
-  useEffect(() => {
-    const saved = localStorage.getItem('eltoy_products')
-    if (saved) {
-      try {
-        setProducts(JSON.parse(saved))
-      } catch (e) {
-        setProducts(initialProducts)
+  // Supabase'тен товарларды жүктөө
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Товарларды жүктөөдө ката:', error)
+      } else if (data) {
+        setProducts(data)
       }
-    } else {
-      setProducts(initialProducts)
-      localStorage.setItem('eltoy_products', JSON.stringify(initialProducts))
+    } catch (err) {
+      console.error('Сервер катасы:', err)
     }
+  }
+
+  useEffect(() => {
+    fetchProducts()
   }, [])
 
-  // Компьютерден/телефондон сүрөт тандоо (5ке чейин)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Компьютерден/телефондон сүрөт тандап, Supabase Storage'ке жүктөө
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files) return
+    if (!files || files.length === 0) return
 
     const remainingSlots = 5 - newImages.length
     if (remainingSlots <= 0) {
@@ -44,17 +55,35 @@ export default function AdminProductsPage() {
       return
     }
 
-    const filesToProcess = Array.from(files).slice(0, remainingSlots)
+    setUploading(true)
+    const filesToUpload = Array.from(files).slice(0, remainingSlots)
+    const uploadedUrls: string[] = []
 
-    filesToProcess.forEach((file) => {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (reader.result) {
-          setNewImages((prev) => [...prev, reader.result as string].slice(0, 5))
-        }
+    for (const file of filesToUpload) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('products')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        alert('Сүрөт жүктөөдө ката: ' + uploadError.message)
+        continue
       }
-      reader.readAsDataURL(file)
-    })
+
+      const { data: publicUrlData } = supabase.storage
+        .from('products')
+        .getPublicUrl(filePath)
+
+      if (publicUrlData?.publicUrl) {
+        uploadedUrls.push(publicUrlData.publicUrl)
+      }
+    }
+
+    setNewImages((prev) => [...prev, ...uploadedUrls].slice(0, 5))
+    setUploading(false)
   }
 
   // URL аркылуу сүрөт кошуу
@@ -73,47 +102,66 @@ export default function AdminProductsPage() {
     setNewImages(newImages.filter((_, i) => i !== index))
   }
 
-  // Жаңы товар кошуу
-  const handleAddProduct = (e: React.FormEvent) => {
+  // Жаңы товарды сактоо
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPrice) return
 
+    setLoading(true)
     const imagesToSave = newImages.length > 0 ? newImages : ['/placeholder.jpg']
 
-    const newProduct = {
-      id: `p-${Date.now()}`,
-      title: newTitle,
-      price: Number(newPrice),
-      category: newCategory,
-      image: imagesToSave[0], // башкы сүрөт
-      images: imagesToSave,   // галерея үчүн бардык 5ке чейинки сүрөттөр
-      description: newDesc,
-      inStock: true,
+    try {
+      const { error } = await supabase
+        .from('products')
+        .insert([
+          {
+            name: newTitle,
+            title: newTitle,
+            price: Number(newPrice),
+            category: newCategory,
+            image_url: imagesToSave[0],
+            image: imagesToSave[0],
+            images: imagesToSave,
+            description: newDesc,
+            in_stock: true,
+          },
+        ])
+
+      if (error) {
+        alert('Ката: ' + error.message)
+      } else {
+        fetchProducts()
+        setNewTitle('')
+        setNewPrice('')
+        setNewDesc('')
+        setNewImages([])
+        setImageUrlInput('')
+        setIsAdding(false)
+      }
+    } catch (err) {
+      alert('Товарды сактоодо ката чыкты.')
+    } finally {
+      setLoading(false)
     }
-
-    const updated = [newProduct, ...products]
-    setProducts(updated)
-    localStorage.setItem('eltoy_products', JSON.stringify(updated))
-
-    // Форманы тазалоо
-    setNewTitle('')
-    setNewPrice('')
-    setNewDesc('')
-    setNewImages([])
-    setImageUrlInput('')
-    setIsAdding(false)
   }
 
   // Товарды өчүрүү
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     if (confirm('Бул товарды өчүрүүнү каалайсызбы?')) {
-      const updated = products.filter((p) => p.id !== id)
-      setProducts(updated)
-      localStorage.setItem('eltoy_products', JSON.stringify(updated))
+      try {
+        const { error } = await supabase.from('products').delete().eq('id', id)
+
+        if (error) {
+          alert('Өчүрүүдө ката: ' + error.message)
+        } else {
+          setProducts(products.filter((p) => p.id !== id))
+        }
+      } catch (err) {
+        alert('Сервер катасы.')
+      }
     }
   }
 
-  // Издөө фильтри
   const filteredProducts = products.filter((p) => {
     const title = (p.title || p.name || '').toLowerCase()
     const category = (p.category || '').toLowerCase()
@@ -128,7 +176,7 @@ export default function AdminProductsPage() {
         <div>
           <h1 className="font-mono text-2xl font-bold uppercase">Товарларды башкаруу</h1>
           <p className="text-sm text-muted-foreground">
-            Складдагы товарлардын тизмеси, баалары жана жаңы товар кошуу.
+            Складдагы товарлардын тизмеси, баалары жана жаңы товар кошуу (Supabase Storage).
           </p>
         </div>
         <Button onClick={() => setIsAdding(!isAdding)} className="rounded-xl gap-2">
@@ -137,11 +185,10 @@ export default function AdminProductsPage() {
         </Button>
       </div>
 
-      {/* ЖАҢЫ ТОВАР КОШУУ ФОРМАСЫ */}
       {isAdding && (
         <form onSubmit={handleAddProduct} className="rounded-2xl border bg-card p-6 shadow-sm space-y-5">
           <h2 className="font-bold text-lg border-b pb-2">Жаңы товардын маалыматтары</h2>
-          
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="text-xs font-semibold text-muted-foreground">Товардын аты *</label>
@@ -177,15 +224,14 @@ export default function AdminProductsPage() {
             </div>
           </div>
 
-          {/* СҮРӨТТӨР ГАЛЕРЕЯСЫ (МАКС 5 СҮРӨТ) */}
           <div className="space-y-3 rounded-xl border border-dashed border-border p-4 bg-muted/20">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Товардын сүрөттөрү (Максимум 5 сүрөт): <span className="text-primary font-bold">{newImages.length}/5</span>
               </label>
+              {uploading && <span className="text-xs text-primary font-semibold animate-pulse">Сүрөт жүктөлүүдө...</span>}
             </div>
 
-            {/* БҮКТӨЛГӨН СҮРӨТТӨРДҮ КӨРСӨТҮҮ */}
             <div className="flex flex-wrap gap-3">
               {newImages.map((img, idx) => (
                 <div key={idx} className="relative size-20 rounded-xl overflow-hidden border bg-background group">
@@ -205,7 +251,6 @@ export default function AdminProductsPage() {
                 </div>
               ))}
 
-              {/* СҮРӨТ ЖҮКТӨӨ БАСКЫЧЫ */}
               {newImages.length < 5 && (
                 <label className="flex size-20 flex-col items-center justify-center rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 cursor-pointer transition text-primary">
                   <Upload className="size-5" />
@@ -214,6 +259,7 @@ export default function AdminProductsPage() {
                     type="file"
                     accept="image/*"
                     multiple
+                    disabled={uploading}
                     onChange={handleFileUpload}
                     className="hidden"
                   />
@@ -221,7 +267,6 @@ export default function AdminProductsPage() {
               )}
             </div>
 
-            {/* Же URL аркылуу кошконго да оңой мүмкүнчүлүк */}
             {newImages.length < 5 && (
               <div className="flex gap-2 pt-2">
                 <Input
@@ -252,14 +297,13 @@ export default function AdminProductsPage() {
             <Button type="button" variant="outline" onClick={() => setIsAdding(false)} className="rounded-xl">
               Токтотуу
             </Button>
-            <Button type="submit" className="rounded-xl">
-              Сактоо
+            <Button type="submit" disabled={loading || uploading} className="rounded-xl">
+              {loading ? 'Сакталууда...' : 'Сактоо'}
             </Button>
           </div>
         </form>
       )}
 
-      {/* ИЗДӨӨ */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -270,7 +314,6 @@ export default function AdminProductsPage() {
         />
       </div>
 
-      {/* ТОВАРЛАР ТАБЛИЦАСЫ */}
       <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -284,37 +327,40 @@ export default function AdminProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-muted/20 transition">
-                  <td className="p-4">
-                    <div className="size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden border relative">
-                      {product.image ? (
-                        <img src={product.image} alt={product.title || product.name || 'Товар'} className="size-full object-cover" />
-                      ) : (
-                        <ImageIcon className="size-5 text-muted-foreground" />
-                      )}
-                      {product.images?.length > 1 && (
-                        <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] px-1 rounded-tl-md font-bold">
-                          +{product.images.length}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 font-medium max-w-xs truncate">{product.title || product.name || 'Аталышы жок'}</td>
-                  <td className="p-4 text-muted-foreground">{product.category || 'Жалпы'}</td>
-                  <td className="p-4 font-mono font-bold">{formatSom(product.price || 0)}</td>
-                  <td className="p-4 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteProduct(product.id)}
-                      className="text-destructive hover:bg-destructive/10 rounded-lg"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {filteredProducts.map((product) => {
+                const imgSource = product.image || product.image_url || product.images?.[0]
+                return (
+                  <tr key={product.id} className="hover:bg-muted/20 transition">
+                    <td className="p-4">
+                      <div className="size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden border relative">
+                        {imgSource ? (
+                          <img src={imgSource} alt={product.title || product.name || 'Товар'} className="size-full object-cover" />
+                        ) : (
+                          <ImageIcon className="size-5 text-muted-foreground" />
+                        )}
+                        {product.images?.length > 1 && (
+                          <span className="absolute bottom-0 right-0 bg-black/70 text-white text-[9px] px-1 rounded-tl-md font-bold">
+                            +{product.images.length}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 font-medium max-w-xs truncate">{product.title || product.name || 'Аталышы жок'}</td>
+                    <td className="p-4 text-muted-foreground">{product.category || 'Жалпы'}</td>
+                    <td className="p-4 font-mono font-bold">{formatSom(product.price || 0)}</td>
+                    <td className="p-4 text-right">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="text-destructive hover:bg-destructive/10 rounded-lg"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
