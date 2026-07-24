@@ -22,6 +22,7 @@ import { CartSheet } from '@/components/cart/cart-sheet'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AuthDialog } from '@/components/auth/auth-dialog'
+import { supabase } from '@/lib/supabase'
 
 const navItems = [
   { title: 'Башкы бет', href: '/' },
@@ -31,12 +32,6 @@ const navItems = [
   { title: 'Байланышуу', href: '/contact' },
 ]
 
-const contactInfo = {
-  address: 'Бишкек ш., Лев Толстой көч. 21',
-  hours: 'Пн-Сб: 08:00 - 18:00',
-  phone: '+996 555 123 456',
-}
-
 export function Header() {
   const router = useRouter()
   const { cartCount, wishlist, compare } = useCart()
@@ -45,9 +40,14 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Логотип жана сайттын аты үчүн стейттер
+  // Логотип, сайттын аты жана байланыштар үчүн стейттер
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [siteName, setSiteName] = useState('ELTOY STROY')
+  const [contactInfo, setContactInfo] = useState({
+    address: 'Бишкек ш., Лев Толстой көч. 21',
+    hours: 'Пн-Сб: 08:00 - 18:00',
+    phone: '+996 555 123 456',
+  })
 
   const searchRef = useRef<HTMLDivElement>(null)
 
@@ -59,18 +59,31 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Настройкаларды localStorage'дан окуп алуу
+  // Настройкаларды Supabase базасынан алуу
   useEffect(() => {
-    const saved = localStorage.getItem('eltoy_settings')
-    if (saved) {
+    async function fetchHeaderSettings() {
       try {
-        const data = JSON.parse(saved)
-        if (data.logoUrl) setLogoUrl(data.logoUrl)
-        if (data.siteName) setSiteName(data.siteName)
-      } catch (e) {
-        console.error(e)
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', 1)
+          .single()
+
+        if (data) {
+          if (data.logo_url) setLogoUrl(data.logo_url)
+          if (data.site_name) setSiteName(data.site_name)
+          setContactInfo({
+            address: data.address || 'Бишкек ш., Лев Толстой көч. 21',
+            hours: data.hours || 'Пн-Сб: 08:00 - 18:00',
+            phone: data.phone || '+996 555 123 456',
+          })
+        }
+      } catch (err) {
+        console.error('Header настройкаларын жүктөөдө ката:', err)
       }
     }
+
+    fetchHeaderSettings()
   }, [])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
