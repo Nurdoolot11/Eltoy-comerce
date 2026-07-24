@@ -59,7 +59,6 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
 
                 const safeName = p.name || p.title || 'Товар'
                 const safePrice = Number(p.price) || 0
-                const safeSlug = p.slug || p.id || ''
 
                 return (
                   <div key={cartItem.id} className="flex gap-3 rounded-xl border border-border bg-card p-3">
@@ -73,13 +72,9 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
                       />
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <Link
-                        href={`/product/${safeSlug}`}
-                        onClick={() => setOpen(false)}
-                        className="line-clamp-2 text-sm font-medium hover:text-primary"
-                      >
+                      <span className="line-clamp-2 text-sm font-medium">
                         {safeName}
-                      </Link>
+                      </span>
                       <span className="mt-0.5 text-sm font-bold text-primary">{formatSom(safePrice)}</span>
                       <div className="mt-auto flex items-center justify-between pt-2">
                         <div className="flex items-center gap-2 rounded-full border border-border">
