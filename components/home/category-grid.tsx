@@ -1,42 +1,128 @@
+'use client'
+
+import { useRef, useState } from 'react'
 import Image from "next/image"
 import Link from "next/link"
 import { categories } from "@/lib/data"
 import { DynamicIcon } from "@/components/dynamic-icon"
 import { Reveal } from "@/components/reveal"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 export function CategoryGrid() {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  
+  // Сенсордук (мыш менен кармап сүрүү) логикасы
+  const [isDown, setIsDown] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeft, setScrollLeft] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return
+    setIsDown(true)
+    setIsDragging(false)
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft)
+    setScrollLeft(scrollContainerRef.current.scrollLeft)
+  }
+
+  const handleMouseLeave = () => {
+    setIsDown(false)
+  }
+
+  const handleMouseUp = () => {
+    setIsDown(false)
+  }
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDown || !scrollContainerRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollContainerRef.current.offsetLeft
+    const walk = (x - startX) * 1.8 // Сүрүү ылдамдыгы
+    if (Math.abs(walk) > 5) {
+      setIsDragging(true)
+    }
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk
+  }
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = direction === 'left' ? -300 : 300
+      scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    }
+  }
+
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 md:py-20">
-      <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
+    <section className="mx-auto max-w-7xl px-4 py-8 border-b border-border/40 select-none">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-primary">Категориялар</p>
-          <h2 className="font-mono text-3xl font-bold uppercase tracking-tight text-foreground md:text-4xl">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Категориялар</p>
+          <h2 className="font-mono text-xl font-bold uppercase tracking-tight text-foreground md:text-2xl">
             Категория боюнча тандаңыз
           </h2>
         </div>
-        <Link href="/catalog" className="text-sm font-semibold text-primary hover:underline">
-          Баарын көрүү →
-        </Link>
+
+        {/* СҮРҮҮ БАСКЫЧТАРЫ */}
+        <div className="hidden sm:flex items-center gap-2">
+          <button
+            onClick={() => scroll('left')}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:border-primary hover:text-primary active:scale-95"
+            aria-label="Солго сүрүү"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors hover:border-primary hover:text-primary active:scale-95"
+            aria-label="Оңго сүрүү"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+      {/* 🔴 ТОЛУК СЕНСОРДУК / ЧЫЧКАН МЕНЕН КАРМАП СҮРМӨ ТИЛКЕ */}
+      <div
+        ref={scrollContainerRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className={`flex items-start gap-4 overflow-x-auto pb-4 pt-2 scrollbar-none cursor-grab active:cursor-grabbing ${
+          isDown ? 'scroll-auto' : 'scroll-smooth'
+        }`}
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
         {categories.map((cat, i) => (
-          <Reveal key={cat.slug} delay={i * 40}>
+          <Reveal key={cat.slug} delay={i * 30}>
             <Link
               href={`/catalog?category=${cat.slug}`}
-              className="group relative flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5"
+              onClick={(e) => {
+                // Эгер кармап сүрүп жаткан болсо, шилтемеге өтүп кетпеши үчүн
+                if (isDragging) e.preventDefault()
+              }}
+              className="group flex flex-col items-center gap-2 shrink-0 w-24 text-center pointer-events-auto"
             >
-              <div className="absolute right-0 top-0 h-24 w-24 opacity-20 transition-transform duration-500 group-hover:scale-110">
-                <Image src={cat.image || "/placeholder.svg"} alt="" fill className="object-contain" />
+              {/* ТЕГЕРЕК СҮРӨТЧӨ */}
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-border bg-card shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-primary group-hover:shadow-md overflow-hidden p-3">
+                {cat.image ? (
+                  <Image 
+                    src={cat.image} 
+                    alt={cat.name} 
+                    fill 
+                    draggable={false}
+                    className="object-contain p-2 transition-transform duration-300 group-hover:scale-110 pointer-events-none" 
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-primary pointer-events-none">
+                    <DynamicIcon name={cat.icon} className="h-8 w-8" />
+                  </div>
+                )}
               </div>
-              <div className="relative z-10">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <DynamicIcon name={cat.icon} className="h-5 w-5" />
-                </div>
-                <h3 className="mt-4 font-semibold leading-tight text-foreground">{cat.name}</h3>
-                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{cat.description}</p>
-              </div>
-              <span className="relative z-10 mt-4 text-xs font-medium text-muted-foreground">{cat.count} товар</span>
+
+              {/* АТЫ */}
+              <span className="text-xs font-semibold text-foreground line-clamp-2 leading-tight group-hover:text-primary transition-colors pointer-events-none">
+                {cat.name}
+              </span>
             </Link>
           </Reveal>
         ))}

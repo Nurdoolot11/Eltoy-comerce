@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, CreditCard, Loader2, LockKeyhole, Truck, MapPin } from 'lucide-react'
+import { CheckCircle2, CreditCard, Loader2, LockKeyhole, Truck, MapPin, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,7 @@ import { useCart } from '@/components/cart/cart-provider'
 import { useAuth } from '@/components/auth/auth-provider'
 import { formatSom } from '@/lib/data'
 import { supabase } from '../../lib/supabase'
+
 export function CheckoutClient() {
   const router = useRouter()
   const { user } = useAuth()
@@ -36,6 +37,29 @@ export function CheckoutClient() {
     }
   }, [user])
 
+  // АДМИН БОЛСО — Заказ берүү бетке киргизбей, эскертүү көрсөтүү
+  if (user?.role === 'admin') {
+    return (
+      <div className="container-px mx-auto max-w-xl py-24 text-center">
+        <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <ShieldAlert className="size-8" />
+        </div>
+        <h1 className="font-mono text-3xl font-bold uppercase">Администратордук режим</h1>
+        <p className="my-4 text-muted-foreground">
+          Сиз админстраторсуз. Сайттагы товарларды көрүп жана текшере аласыз, бирок кардар сыяктуу заказ бере албайсыз.
+        </p>
+        <div className="flex justify-center gap-3">
+          <Button onClick={() => router.push('/admin')} className="font-bold">
+            Админ панелге өтүү
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/catalog')}>
+            Каталогду карап чыгуу
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
@@ -60,6 +84,7 @@ export function CheckoutClient() {
             items: orderItems,
             total: cartTotal,
             status: 'Кабыл алынды',
+            user_id: user?.id || null, // ← Бул тилке заказ кимге таандык экенин сактайт
           },
         ])
         .select()
@@ -153,7 +178,7 @@ export function CheckoutClient() {
               </div>
               <div className="relative h-[220px] w-full">
                 <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2923.6334419614234!2d74.61633519999999!3d42.8858229!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x389eb7eb9875f6a9%3A0x6339009df3dc9e5f!2zMjM0INC_0YDQvtGB0L8uINCW0B3QsdC10Log0JbQvtC70YMsINCR0LjRiNC60LXQug!5e0!3m2!1sky!2skg!4v1715800000000!5m2!1sky!2skg"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2923.6334419614234!2d74.61633519999999!3d42.8858229!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x389eb7eb9875f6a9%3A0x6339009df3dc9e5f!2sMjM0INC_0YDQvtGB0L8uINCW0B3QsdC10Log0JbQvtC70YMsINCR0LjRiNC60LXQug!5e0!3m2!1sky!2skg!4v1715800000000!5m2!1sky!2skg"
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}

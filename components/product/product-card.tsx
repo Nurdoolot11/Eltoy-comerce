@@ -20,23 +20,30 @@ export function ProductCard({ product }: { product: Product }) {
   const inWishlist = wishlist.includes(product.id)
   const inCompare = compare.includes(product.id)
 
+  // 1. Аты менен сүрөтүн камсыздап алуу
+  const productName = product.name || (product as any).title || 'Товар'
+  const productImage = product.image || (product as any).image_url || '/placeholder.svg'
+
+  // 2. Slug же ID боюнча шилтеме
+  const productPath = `/product/${product.slug || product.id}`
+
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/5">
       {/* Badges */}
       <div className="absolute left-3 top-3 z-10 flex flex-col gap-1.5">
-        {product.badges.slice(0, 2).map((b) => (
+        {(product.badges || []).slice(0, 2).map((b) => (
           <span
             key={b}
-            className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-bold', badgeLabels[b].className)}
+            className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-bold', badgeLabels[b]?.className || 'bg-primary text-primary-foreground')}
           >
-            {badgeLabels[b].label}
+            {badgeLabels[b]?.label || b}
           </span>
         ))}
-        {discount && (
+        {discount ? (
           <span className="rounded-full bg-destructive px-2.5 py-0.5 text-[11px] font-bold text-white">
             -{discount}%
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* Quick actions */}
@@ -63,10 +70,10 @@ export function ProductCard({ product }: { product: Product }) {
         </button>
       </div>
 
-      <Link href={`/product/${product.slug}`} className="relative block aspect-square overflow-hidden bg-secondary/40">
+      <Link href={productPath} className="relative block aspect-square overflow-hidden bg-secondary/40">
         <Image
-          src={product.image || '/placeholder.svg'}
-          alt={product.name}
+          src={productImage}
+          alt={productName}
           fill
           sizes="(max-width: 768px) 50vw, 25vw"
           className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
@@ -80,18 +87,18 @@ export function ProductCard({ product }: { product: Product }) {
           </span>
           <span className="flex items-center gap-0.5 text-xs">
             <Star className="size-3.5 fill-primary text-primary" />
-            <span className="font-semibold">{product.rating}</span>
+            <span className="font-semibold">{product.rating || 5}</span>
           </span>
         </div>
 
-        <Link href={`/product/${product.slug}`}>
+        <Link href={productPath}>
           <h3 className="line-clamp-2 min-h-10 text-sm font-semibold leading-tight hover:text-primary">
-            {product.name}
+            {productName}
           </h3>
         </Link>
 
         <div className="mt-2 flex items-center gap-1.5 text-xs">
-          {product.stock > 0 ? (
+          {(product.stock ?? 1) > 0 || (product as any).in_stock ? (
             <span className="flex items-center gap-1 text-emerald-500">
               <Check className="size-3.5" /> Складда бар
             </span>
@@ -103,11 +110,11 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="mt-auto pt-3">
           <div className="mb-2 flex items-end gap-2">
             <span className="text-lg font-bold">{formatSom(product.price)}</span>
-            {product.oldPrice && (
+            {product.oldPrice ? (
               <span className="mb-0.5 text-sm text-muted-foreground line-through">
                 {formatSom(product.oldPrice)}
               </span>
-            )}
+            ) : null}
           </div>
           <button
             onClick={() => addToCart(product.id)}

@@ -1,20 +1,51 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { LogOut, Package, UserRound, ShieldCheck, ArrowRight } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { LogOut, Package, UserRound, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react'
 import { SiteShell } from '@/components/site/site-shell'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AuthDialog } from '@/components/auth/auth-dialog'
 import { useAuth } from '@/components/auth/auth-provider'
-import { getOrders } from '@/lib/demo-store'
 import { formatSom } from '@/lib/data'
+import { supabase } from '@/lib/supabase'
 
 export function AccountClient() {
   const { user, ready, logout, update } = useAuth()
   const [, refresh] = useState(0)
+  
+  const [orders, setOrders] = useState<any[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(true)
+
+  // Колдонуучунун заказдарын Supabase базасынан алуу
+  useEffect(() => {
+    async function fetchUserOrders() {
+      if (!user?.id) {
+        setLoadingOrders(false)
+        return
+      }
+
+      setLoadingOrders(true)
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id) // ← Базадан ушул колдонуучунун ID си бар заказдарды гана алабыз
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Заказдарды жүктөө катасы:', error)
+      } else {
+        setOrders(data || [])
+      }
+      setLoadingOrders(false)
+    }
+
+    if (user) {
+      fetchUserOrders()
+    }
+  }, [user])
 
   if (!ready) return null
 
@@ -32,8 +63,6 @@ export function AccountClient() {
       </SiteShell>
     )
   }
-
-  const orders = getOrders().filter((o) => o.userId === user.id)
 
   const submit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -102,33 +131,40 @@ export function AccountClient() {
           </form>
 
           <section>
-            <h2 className="mb-4 font-mono text-2xl font-bold uppercase">Заказдар</h2>
-            <div className="flex flex-col gap-3">
-              {orders.map((o) => (
-                <Link
-                  href={`/invoice/${o.id}`}
-                  key={o.id}
-                  className="flex items-center gap-4 rounded-2xl border bg-card p-4 hover:border-primary"
-                >
-                  <Package className="size-8 text-primary" />
-                  <div className="flex-1">
-                    <b>{o.id}</b>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(o.createdAt).toLocaleDateString('ky-KG')} · {o.status}
-                    </p>
-                  </div>
-                  <b>{formatSom(o.total)}</b>
-                </Link>
-              ))}
-              {!orders.length && (
-                <div className="rounded-2xl border bg-card p-10 text-center text-muted-foreground">
-                  Азырынча заказ жок.{' '}
-                  <Link href="/catalog" className="text-primary">
-                    Каталогду көрүү
+            <h2 className="mb-4 font-mono text-2xl font-bold uppercase">Менин заказдарым</h2>
+            
+            {loadingOrders ? (
+              <div className="flex h-32 items-center justify-center rounded-2xl border bg-card gap-2 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                <span className="text-sm">Заказдар жүктөлүүдө...</span>
+              </div>
+            ) : orders.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {orders.map((o) => (
+                  <Link
+                    href={`/invoice/${o.id}`}
+                    key={o.id}
+                    className="flex items-center gap-4 rounded-2xl border bg-card p-4 hover:border-primary transition"
+                  >
+                    <Package className="size-8 text-primary" />
+                    <div className="flex-1">
+                      <b className="font-mono text-sm">#{o.id.slice(0, 8)}...</b>
+                      <p className="text-xs text-muted-foreground">
+                        {o.created_at ? new Date(o.created_at).toLocaleDateString('ky-KG') : ''} · <span className="font-semibold text-foreground">{o.status || 'Кабыл алынды'}</span>
+                      </p>
+                    </div>
+                    <b className="font-mono text-primary">{formatSom(o.total)}</b>
                   </Link>
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border bg-card p-10 text-center text-muted-foreground">
+                Азырынча заказдарыңыз жок.{' '}
+                <Link href="/catalog" className="text-primary hover:underline font-medium">
+                  Каталогду көрүү
+                </Link>
+              </div>
+            )}
           </section>
         </div>
       </div>

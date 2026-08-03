@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import {
   Search,
   ShoppingCart,
@@ -14,6 +14,13 @@ import {
   X,
   GitCompareArrows,
   Truck,
+  Wrench,
+  Zap,
+  Hammer,
+  ChevronRight,
+  Sparkles,
+  Percent,
+  CheckCircle2,
 } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -23,6 +30,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth/auth-provider'
 import { AuthDialog } from '@/components/auth/auth-dialog'
 import { supabase } from '@/lib/supabase'
+import { products, formatSom } from '@/lib/data'
 
 const navItems = [
   { title: 'Башкы бет', href: '/' },
@@ -30,6 +38,15 @@ const navItems = [
   { title: 'Биз жөнүндө', href: '/about' },
   { title: 'Жаңылыктар', href: '/news' },
   { title: 'Байланышуу', href: '/contact' },
+]
+
+// ИНСТРУМЕНТТЕРДИН ЖАНА КАТЕГОРИЯЛАРДЫН ТЕГЕРЕК СҮРӨТЧӨЛӨРҮ (SHEIN СТИЛИНДЕ)
+const toolCategories = [
+  { title: 'Скидкалар & Акциялар', href: '/catalog?sale=true', icon: Percent, color: 'bg-red-500/10 text-red-500 border-red-500/30' },
+  { title: 'Перфораторлор & Дреллер', href: '/catalog?cat=perforator', icon: Hammer, color: 'bg-amber-500/10 text-amber-500 border-amber-500/30' },
+  { title: 'Шуруповерттер', href: '/catalog?cat=screwdriver', icon: Wrench, color: 'bg-blue-500/10 text-blue-500 border-blue-500/30' },
+  { title: 'Электр инструменттер', href: '/catalog?cat=power-tools', icon: Zap, color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' },
+  { title: 'Жаңы келгендер', href: '/catalog?sort=new', icon: Sparkles, color: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' },
 ]
 
 export function Header() {
@@ -40,7 +57,6 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // Логотип, сайттын аты жана байланыштар үчүн стейттер
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [siteName, setSiteName] = useState('ELTOY STROY')
   const [contactInfo, setContactInfo] = useState({
@@ -59,11 +75,10 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Настройкаларды Supabase базасынан алуу
   useEffect(() => {
     async function fetchHeaderSettings() {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('settings')
           .select('*')
           .eq('id', 1)
@@ -85,6 +100,26 @@ export function Header() {
 
     fetchHeaderSettings()
   }, [])
+
+  // Акылдуу автосунуштар (Башынан башталып же так дал келгендерди биринчи чыгарчу кылып түзөтүлдү)
+  const suggestions = useMemo(() => {
+    if (!query.trim()) return []
+    const term = query.toLowerCase().trim()
+    
+    // 1. Биринчи кезекте аты ошол тамгадан башталгандарды табабыз (startsWith)
+    const startsWithMatches = products.filter(p => 
+      p.name.toLowerCase().trim().startsWith(term)
+    )
+
+    // 2. Андан кийин ичинен камтыгандарды табабыз (includes)
+    const includesMatches = products.filter(p => 
+      !p.name.toLowerCase().trim().startsWith(term) && 
+      p.name.toLowerCase().includes(term)
+    )
+
+    // Башынан башталгандарын алдыга коюп бириктиребиз
+    return [...startsWithMatches, ...includesMatches].slice(0, 5)
+  }, [query])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -125,18 +160,18 @@ export function Header() {
         )}
       >
         <div className="container-px mx-auto flex max-w-7xl items-center gap-4 py-3">
-          {/* Mobile menu */}
+          {/* Mobile menu Button */}
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger className="lg:hidden p-2 hover:bg-muted rounded-md transition" aria-label="Меню">
               <Menu className="size-6" />
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] p-0">
+            <SheetContent side="left" className="w-[320px] sm:w-[380px] p-0 overflow-y-auto">
               <SheetTitle className="sr-only">Негизги меню</SheetTitle>
               <MobileMenu logoUrl={logoUrl} siteName={siteName} onNavigate={() => setMenuOpen(false)} />
             </SheetContent>
           </Sheet>
 
-          {/* ТОГОЛОК ЖАНА ЖЫЛДЫРЫЛМА ЛОГОТИП */}
+          {/* ЛОГОТИП */}
           <Link href="/" className="flex items-center gap-3 shrink-0 group">
             {logoUrl ? (
               <div className="relative size-11 rounded-full overflow-hidden border-2 border-primary/30 shadow-sm bg-background flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
@@ -159,8 +194,8 @@ export function Header() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Издөө..."
-                className="w-full rounded-full border border-input bg-background px-4 py-2 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder="Инструменттерди издөө (мисалы: д, дрель)..."
+                className="w-full rounded-full border border-input bg-background px-4 py-2 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
               <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
               {query && (
@@ -173,6 +208,29 @@ export function Header() {
                 </button>
               )}
             </form>
+
+            {/* Автоматтык сунуштар асма тизмеси (Автозаполнение) */}
+            {suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-border overflow-hidden z-50 text-neutral-900">
+                <div className="bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-700 flex items-center gap-1.5 border-b border-rose-100">
+                  <CheckCircle2 className="size-3.5 text-rose-600" /> Сунушталган шаймандар:
+                </div>
+                {suggestions.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setQuery(item.name)
+                      router.push(`/catalog?q=${encodeURIComponent(item.name)}`)
+                    }}
+                    className="w-full text-left flex items-center justify-between px-4 py-3 hover:bg-rose-50/80 transition text-xs border-b border-border/40 last:border-none cursor-pointer bg-white"
+                  >
+                    <span className="font-extrabold text-neutral-900">{item.name}</span>
+                    <span className="text-rose-600 font-black text-sm">{formatSom(item.price)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -232,6 +290,7 @@ function Badge({ children }: { children: React.ReactNode }) {
   )
 }
 
+/* ЗАМАНБАП МЕНИЮ (SHEIN УСЛУГИ СТИЛИНДЕ) */
 function MobileMenu({
   logoUrl,
   siteName,
@@ -242,35 +301,71 @@ function MobileMenu({
   onNavigate: () => void
 }) {
   return (
-    <div className="flex flex-col h-full p-4 space-y-4">
-      <div className="flex items-center gap-3 border-b pb-3">
-        {logoUrl ? (
-          <div className="size-10 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center">
-            <img src={logoUrl} alt={siteName} className="size-full object-cover object-center" />
-          </div>
-        ) : null}
-        <span className="font-bold text-lg text-primary">{siteName}</span>
+    <div className="flex flex-col h-full bg-background p-4 space-y-6">
+      {/* Шапка меню */}
+      <div className="flex items-center justify-between border-b pb-4">
+        <div className="flex items-center gap-3">
+          {logoUrl ? (
+            <div className="size-10 rounded-full overflow-hidden border border-primary/30 flex items-center justify-center">
+              <img src={logoUrl} alt={siteName} className="size-full object-cover" />
+            </div>
+          ) : null}
+          <span className="font-extrabold text-lg text-primary uppercase">{siteName}</span>
+        </div>
       </div>
 
-      <nav className="flex flex-col space-y-2">
-        {navItems.map((item) => (
+      {/* 🟢 КАТЕГОРИЯЛАРДЫН ТЕГЕРЕК ИКОНКАЛАРЫ (SHEIN СТИЛИНДЕ) */}
+      <div>
+        <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">Категориялар</p>
+        <div className="space-y-2">
+          {toolCategories.map((cat) => {
+            const IconComponent = cat.icon
+            return (
+              <Link
+                key={cat.href}
+                href={cat.href}
+                onClick={onNavigate}
+                className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 hover:border-primary/50 transition group bg-card"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn('size-10 rounded-full border flex items-center justify-center shrink-0 shadow-sm', cat.color)}>
+                    <IconComponent className="size-5" />
+                  </div>
+                  <span className="text-sm font-medium group-hover:text-primary transition">{cat.title}</span>
+                </div>
+                <ChevronRight className="size-4 text-muted-foreground group-hover:translate-x-1 transition" />
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+
+      <hr className="border-border/60" />
+
+      {/* Навигация шилтемелери */}
+      <div>
+        <p className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">Навигация</p>
+        <nav className="flex flex-col space-y-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onNavigate}
+              className="text-sm font-medium hover:text-primary py-2 px-1 transition flex items-center justify-between"
+            >
+              <span>{item.title}</span>
+              <ChevronRight className="size-3.5 text-muted-foreground" />
+            </Link>
+          ))}
           <Link
-            key={item.href}
-            href={item.href}
+            href="/track"
             onClick={onNavigate}
-            className="text-sm font-medium hover:text-primary py-2 transition"
+            className="text-sm font-medium py-2 px-1 transition flex items-center gap-2 text-amber-500 hover:text-amber-600"
           >
-            {item.title}
+            <Truck className="size-4" /> Заказды көзөмөлдөө
           </Link>
-        ))}
-        <Link
-          href="/track"
-          onClick={onNavigate}
-          className="text-sm font-medium hover:text-primary py-2 transition flex items-center gap-2 text-amber-500"
-        >
-          <Truck className="size-4" /> Заказды көзөмөлдөө
-        </Link>
-      </nav>
+        </nav>
+      </div>
     </div>
   )
 }
