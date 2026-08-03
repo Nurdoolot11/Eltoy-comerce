@@ -19,20 +19,28 @@ export function AccountClient() {
   const [orders, setOrders] = useState<any[]>([])
   const [loadingOrders, setLoadingOrders] = useState(true)
 
-  // Колдонуучунун заказдарын Supabase базасынан алуу
   useEffect(() => {
     async function fetchUserOrders() {
-      if (!user?.id) {
+      if (!user) {
         setLoadingOrders(false)
         return
       }
 
       setLoadingOrders(true)
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', user.id) // ← Базадан ушул колдонуучунун ID си бар заказдарды гана алабыз
-        .order('created_at', { ascending: false })
+
+      // Реалдуу туруктуу сурам: ID, Email же телефон дал келсе эле заказдарды чыгарат
+      const conditions: string[] = []
+      if (user.id) conditions.push(`user_id.eq.${user.id}`)
+      if (user.email) conditions.push(`customer_email.eq.${user.email}`)
+      if (user.phone) conditions.push(`phone.eq.${user.phone}`)
+
+      let query = supabase.from('orders').select('*')
+
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','))
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) {
         console.error('Заказдарды жүктөө катасы:', error)
@@ -89,7 +97,6 @@ export function AccountClient() {
           </Button>
         </div>
 
-        {/* ЭГЕР КОЛДОНУУЧУ АДМИН БОЛСО, АДМИН ПАНЕЛГЕ ӨТҮҮЧҮ БАСКЫЧ КӨРСӨТҮЛӨТ */}
         {user.role === 'admin' && (
           <div className="mb-8 rounded-2xl border border-primary/50 bg-primary/10 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-4">
@@ -148,7 +155,7 @@ export function AccountClient() {
                   >
                     <Package className="size-8 text-primary" />
                     <div className="flex-1">
-                      <b className="font-mono text-sm">#{o.id.slice(0, 8)}...</b>
+                      <b className="font-mono text-sm">#{String(o.id).slice(0, 8)}...</b>
                       <p className="text-xs text-muted-foreground">
                         {o.created_at ? new Date(o.created_at).toLocaleDateString('ky-KG') : ''} · <span className="font-semibold text-foreground">{o.status || 'Кабыл алынды'}</span>
                       </p>

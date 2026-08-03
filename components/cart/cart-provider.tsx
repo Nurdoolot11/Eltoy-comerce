@@ -1,8 +1,9 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { products, type Product } from '@/lib/data'
+import { products as staticProducts, type Product } from '@/lib/data'
+import { supabase } from '@/lib/supabase'
 
 export type CartItem = {
   id: string
@@ -35,6 +36,29 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<string[]>([])
   const [compare, setCompare] = useState<string[]>([])
   const [hydrated, setHydrated] = useState(false)
+  
+  // Supabase'тен алынган динамикалык товарлардын кэши
+  const [allProducts, setAllProducts] = useState<Product[]>(staticProducts)
+
+  // Барака киргенде жана заказдар өзгөргөндө Supabase'теги БАРДЫК товарларды жүктөө
+  useEffect(() => {
+    async function loadAllProducts() {
+      try {
+        const { data, error } = await supabase.from('products').select('*')
+        if (!error && data && data.length > 0) {
+          // Статикалык жана Supabase'теги товарларды бириктирүү
+          const combined = [...data, ...staticProducts]
+          // Идентификатор боюнча дубликаттарды тазалоо
+          const uniqueProducts = Array.from(new Map(combined.map(p => [p.id, p])).values())
+          setAllProducts(uniqueProducts as Product[])
+        }
+      } catch (err) {
+        console.error('Товарларды жүктөөдө ката:', err)
+      }
+    }
+
+    loadAllProducts()
+  }, [])
 
   useEffect(() => {
     try {
@@ -57,28 +81,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (hydrated) localStorage.setItem(COMPARE_KEY, JSON.stringify(compare))
   }, [compare, hydrated])
 
-  const getProductById = (id: string) => products.find((p) => p.id === id)
+  const getProductById = useCallback(
+    (id: string) => allProducts.find((p) => String(p.id) === String(id)),
+    [allProducts]
+  )
 
   const addToCart = (id: string, quantity = 1) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.id === id)
+      const existing = prev.find((i) => String(i.id) === String(id))
       if (existing) {
-        return prev.map((i) => (i.id === id ? { ...i, quantity: i.quantity + quantity } : i))
+        return prev.map((i) => (String(i.id) === String(id) ? { ...i, quantity: i.quantity + quantity } : i))
       }
       return [...prev, { id, quantity }]
     })
+
+    const product = getProductById(id)
     toast.success('Себетке кошулду', {
-      description: getProductById(id)?.name,
+      description: product?.name || 'Товар',
     })
   }
 
   const removeFromCart = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id))
+    setItems((prev) => prev.filter((i) => String(i.id) !== String(id)))
   }
 
   const updateQuantity = (id: string, quantity: number) => {
     if (quantity < 1) return
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)))
+    setItems((prev) => prev.map((i) => (String(i.id) === String(id) ? { ...i, quantity } : i)))
   }
 
   const clearCart = () => setItems([])
@@ -107,13 +136,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   const cartCount = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items])
+  
   const cartTotal = useMemo(
     () =>
       items.reduce((s, i) => {
         const p = getProductById(i.id)
-        return s + (p ? p.price * i.quantity : 0)
+        return s + (p ? Number(p.price) * i.quantity : 0)
       }, 0),
-    [items],
+    [items, getProductById],
   )
 
   const value: CartContextValue = {

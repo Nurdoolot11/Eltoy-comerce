@@ -19,12 +19,10 @@ export function CheckoutClient() {
   const [loading, setLoading] = useState(false)
   const [paid, setPaid] = useState(false)
 
-  // Формадагы талаалар
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [address, setAddress] = useState('')
 
-  // Колдонуучунун маалыматтарын автоматтык түрдө жүктөө
   useEffect(() => {
     if (user) {
       setName(user.name || '')
@@ -37,7 +35,6 @@ export function CheckoutClient() {
     }
   }, [user])
 
-  // АДМИН БОЛСО — Заказ берүү бетке киргизбей, эскертүү көрсөтүү
   if (user?.role === 'admin') {
     return (
       <div className="container-px mx-auto max-w-xl py-24 text-center">
@@ -46,7 +43,7 @@ export function CheckoutClient() {
         </div>
         <h1 className="font-mono text-3xl font-bold uppercase">Администратордук режим</h1>
         <p className="my-4 text-muted-foreground">
-          Сиз админстраторсуз. Сайттагы товарларды көрүп жана текшере аласыз, бирок кардар сыяктуу заказ бере албайсыз.
+          Сиз администраторсуз. Кардар сыяктуу заказ бере албайсыз.
         </p>
         <div className="flex justify-center gap-3">
           <Button onClick={() => router.push('/admin')} className="font-bold">
@@ -64,7 +61,6 @@ export function CheckoutClient() {
     e.preventDefault()
     setLoading(true)
 
-    // Даректи эстеп калуу
     localStorage.setItem('eltoy_customer_address', address)
 
     const orderItems = items.flatMap(i => {
@@ -73,25 +69,26 @@ export function CheckoutClient() {
     })
 
     try {
-      // Supabase маалымат базасына заказды киргизүү
+      // Реалдуу сактоо: Колдонуучунун ID'си, эмейли, телефону туура сакталат
       const { data, error } = await supabase
         .from('orders')
         .insert([
           {
+            user_id: user?.id || null,
             customer_name: name || user?.name || 'Кардар',
-            phone: phone || user?.phone || '+996 700 000 000',
+            customer_email: user?.email || null,
+            phone: phone || user?.phone || '',
             address: address || 'Бишкек ш.',
             items: orderItems,
             total: cartTotal,
             status: 'Кабыл алынды',
-            user_id: user?.id || null, // ← Бул тилке заказ кимге таандык экенин сактайт
           },
         ])
         .select()
 
       if (error) {
         console.error('Supabase катасы:', error)
-        alert('Заказды сактоодо ката чыкты: ' + error.message)
+        alert('Заказ сакталган жок: ' + error.message)
         setLoading(false)
         return
       }
@@ -102,7 +99,6 @@ export function CheckoutClient() {
       setLoading(false)
       setPaid(true)
 
-      // Чекке багыттоо
       setTimeout(() => router.push(`/invoice/${createdOrder.id}`), 1200)
     } catch (err) {
       console.error('Ката:', err)
@@ -115,7 +111,7 @@ export function CheckoutClient() {
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
       <CheckCircle2 className="size-16 text-primary animate-bounce" />
       <h1 className="font-mono text-3xl font-bold uppercase">Заказ ийгиликтүү кабыл алынды!</h1>
-      <p className="text-muted-foreground">Электрондук чек даярдалууда жеке кабинетке багытталууда...</p>
+      <p className="text-muted-foreground">Электрондук чек даярдалууда...</p>
     </div>
   )
 
@@ -134,14 +130,24 @@ export function CheckoutClient() {
           <Section title="1. Алуучунун маалыматы">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="name">Аты-жөнү</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="name">Аты-жөнү</Label>
+                  {!!user && (
+                    <span className="text-[11px] font-medium text-amber-500">
+                      (Аккаунттан алынды)
+                    </span>
+                  )}
+                </div>
                 <Input 
                   id="name" 
                   name="name" 
                   required 
                   value={name} 
                   onChange={(e) => setName(e.target.value)} 
-                  placeholder="Атыңызды киргизиңиз" 
+                  placeholder="Атыңызды киргизиңиз"
+                  disabled={!!user}
+                  readOnly={!!user}
+                  className={user ? 'bg-muted/50 text-muted-foreground cursor-not-allowed select-none' : ''}
                 />
               </div>
 
@@ -170,7 +176,6 @@ export function CheckoutClient() {
               />
             </div>
 
-            {/* 2GIS Картасынын интерактивдүү блогу */}
             <div className="mt-4 overflow-hidden rounded-xl border border-border bg-muted/40">
               <div className="flex items-center gap-2 border-b bg-card px-4 py-2 text-xs font-semibold text-muted-foreground">
                 <MapPin className="size-4 text-primary" />
@@ -187,16 +192,6 @@ export function CheckoutClient() {
                   referrerPolicy="no-referrer-when-downgrade"
                 ></iframe>
               </div>
-              <div className="p-3 bg-card text-center">
-                <a 
-                  href="https://go.2gis.com/IxVjD" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
-                >
-                  2GIS картасынан ачуу ↗
-                </a>
-              </div>
             </div>
           </Section>
 
@@ -209,7 +204,7 @@ export function CheckoutClient() {
               >
                 <CreditCard className="mb-3 size-5 text-primary" />
                 <b className="block">Банк картасы</b>
-                <p className="text-sm text-muted-foreground">Демо онлайн төлөм</p>
+                <p className="text-sm text-muted-foreground">Онлайн төлөм</p>
               </button>
 
               <button 
@@ -268,7 +263,7 @@ export function CheckoutClient() {
           </Button>
           <p className="mt-3 text-center text-xs text-muted-foreground">
             <LockKeyhole className="mr-1 inline size-3" />
-            Бул демо, чыныгы акча алынбайт
+            Коопсуз онлайн төлөм
           </p>
         </aside>
       </form>
