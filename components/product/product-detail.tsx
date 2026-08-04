@@ -79,27 +79,46 @@ export function ProductDetail({ product }: { product: any }) {
   const related = (staticProducts || []).filter(p => p.category === productCategory && p.id !== product.id).slice(0, 4)
   const productReviews = reviews.filter((r: any) => r.productName === productName && r.status === 'опубликовано')
 
+  // 🎬 Шилтеме түрүнө жараша видео/embed форматтарын иштеп чыгуу
+  const getVideoEmbedUrl = (url: string) => {
+    if (!url) return ''
+    if (url.includes('instagram.com')) {
+      const cleanUrl = url.split('?')[0].replace(/\/$/, '')
+      return `${cleanUrl}/embed`
+    }
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      const videoId = url.includes('youtu.be') 
+        ? url.split('youtu.be/')[1]?.split('?')[0]
+        : url.split('v=')[1]?.split('&')[0]
+      return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1`
+    }
+    return url
+  }
+
+  const isIframeVideo = videoUrl && (videoUrl.includes('instagram.com') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))
+
   return (
     <div className="container-px relative mx-auto max-w-7xl py-8">
       <p className="mb-6 text-sm text-muted-foreground">Каталог / {getBrandName(product.brand)} / {productName}</p>
       
       <div className="grid gap-8 lg:grid-cols-2">
-        {/* Сол тарап: Башкы сүрөт + Сүрөттүн ичиндеги оң бурчтагы вертикалдуу видео карточка */}
+        {/* Сол тарап: Башкы сүрөт + Pinduoduo стилиндеги видео карточка */}
         <div className="flex flex-col gap-4">
           <div className="relative aspect-square overflow-hidden rounded-3xl bg-secondary">
             <Image src={active} alt={productName} fill className="object-contain p-8" priority/>
 
-            {/* 🎬 СҮРӨТТҮН ИЧИНДЕГИ ОҢ БУРЧТАГЫ КИЧИНЕКЕЙ ВЕРТИКАЛДУУ ВИДЕО КАРТОЧКА */}
+            {/* 🎬 PINDUODUO СТИЛИНДЕГИ КИЧИНЕКЕЙ ВЕРТИКАЛДУУ ВИДЕО КАРТОЧКА */}
             {videoUrl && (
               <div 
                 onClick={() => setIsVideoModalOpen(true)}
-                className="group absolute bottom-4 right-4 z-10 flex h-36 w-24 cursor-pointer overflow-hidden rounded-2xl border-2 border-white/80 bg-black shadow-2xl transition-all duration-300 hover:scale-105 hover:border-primary md:h-44 md:w-28"
+                className="group absolute bottom-4 right-4 z-10 flex h-36 w-24 cursor-pointer overflow-hidden rounded-2xl border-2 border-white/90 bg-black shadow-2xl transition-all duration-300 hover:scale-105 hover:border-primary md:h-44 md:w-28"
                 title="Чоңойтуп көрүү үчүн басыңыз"
               >
-                {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? (
+                {isIframeVideo ? (
                   <iframe
-                    src={`${videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}?autoplay=1&mute=1&controls=0&loop=1`}
-                    className="pointer-events-none size-full scale-150 object-cover opacity-85 transition-opacity group-hover:opacity-100"
+                    src={getVideoEmbedUrl(videoUrl)}
+                    className="pointer-events-none size-full scale-125 object-cover opacity-90 transition-opacity group-hover:opacity-100"
+                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
                   />
                 ) : (
                   <video
@@ -108,19 +127,19 @@ export function ProductDetail({ product }: { product: any }) {
                     muted
                     loop
                     playsInline
-                    className="pointer-events-none size-full object-cover opacity-85 transition-opacity group-hover:opacity-100"
+                    className="pointer-events-none size-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
                   />
                 )}
 
                 {/* Басканга чакырган Play сөлөкөтү */}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/10">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-110">
+                  <div className="flex size-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-110">
                     <Play className="ml-0.5 size-4 fill-white" />
                   </div>
                 </div>
 
-                {/* Ичиндеги X (жабуу) баскычынын ордуна сөлөкөт */}
-                <div className="absolute right-1.5 top-1.5 rounded-full bg-black/50 p-1 text-white opacity-80 backdrop-blur-md">
+                {/* Чоңойтуу сөлөкөтү */}
+                <div className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white opacity-80 backdrop-blur-md">
                   <Maximize2 className="size-3" />
                 </div>
               </div>
@@ -187,23 +206,23 @@ export function ProductDetail({ product }: { product: any }) {
         </div>
       </div>
 
-      {/* 🔍 ВИДЕО БАСЫЛГАНДА ЧОҢОЮП АЧЫЛАТ (Popup Video Modal) */}
+      {/* 🔍 ВИДЕО БАСЫЛГАНДА ЧОҢОЮП АЧЫЛАТ (Popup Modal) */}
       {isVideoModalOpen && videoUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-black shadow-2xl">
+          <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-black shadow-2xl">
             <button
               onClick={() => setIsVideoModalOpen(false)}
-              className="absolute right-4 top-4 z-10 grid size-10 place-items-center rounded-full bg-black/60 text-white transition hover:bg-destructive"
+              className="absolute right-4 top-4 z-20 grid size-10 place-items-center rounded-full bg-black/70 text-white transition hover:bg-destructive"
               aria-label="Жабуу"
             >
               <X className="size-6" />
             </button>
 
-            <div className="aspect-video w-full">
-              {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? (
+            <div className="relative aspect-[9/16] max-h-[80vh] w-full mx-auto flex items-center justify-center bg-black">
+              {isIframeVideo ? (
                 <iframe
-                  src={`${videoUrl.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')}?autoplay=1`}
-                  className="size-full rounded-3xl"
+                  src={getVideoEmbedUrl(videoUrl)}
+                  className="size-full rounded-2xl border-0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
@@ -213,7 +232,7 @@ export function ProductDetail({ product }: { product: any }) {
                   controls
                   autoPlay
                   playsInline
-                  className="size-full rounded-3xl object-contain"
+                  className="size-full rounded-2xl object-contain"
                 />
               )}
             </div>

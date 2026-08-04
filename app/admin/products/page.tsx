@@ -1,200 +1,121 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, Search, Image as ImageIcon, X, Upload, Video, Percent, Edit3, Check, Sparkles, Box, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { products as localProducts, formatSom } from '@/lib/data'
-import { supabase } from '@/lib/supabase'
-
-const CATEGORY_MAP: Record<string, string> = {
-  dreldar: 'Дрельдер',
-  perforatorlor: 'Перфораторлор',
-  bolgarkalar: 'Болгаркалар',
-  generatorlor: 'Генераторлор',
-  shurupovertter: 'Шуруповерттер',
-  shlangtar: 'Шлангдар',
-  nasostar: 'Насостор',
-  araalar: 'Араалар',
-  saw: 'Араалар',
-  kompressorlor: 'Компрессорлор',
-  'shiretuu-apparattary': 'Ширетүү аппараттары',
-  svarok: 'Ширетүү аппараттары',
-  'kol-shaymandary': 'Кол шаймандары',
-  'olchoo-shaymandary': 'Өлчөө шаймандары',
-  koopsuzduk: 'Коопсуздук каражаттары',
-  batareyalar: 'Батареялар жана кубаттагычтар',
-  аксессуарлар: 'Аксессуарлар',
-  турулуш: 'Курулуш материалдары',
-  'турулуш материалдары': 'Курулуш материалдары',
-}
-
-const INITIAL_CATEGORY_OPTIONS = [
-  { value: 'dreldar', label: 'Дрельдер' },
-  { value: 'perforatorlor', label: 'Перфораторлор' },
-  { value: 'bolgarkalar', label: 'Болгаркалар' },
-  { value: 'generatorlor', label: 'Генераторлор' },
-  { value: 'shurupovertter', label: 'Шуруповерттер' },
-  { value: 'kompressorlor', label: 'Компрессорлор' },
-  { value: 'shiretuu-apparattary', label: 'Ширетүү аппараттары' },
-  { value: 'araalar', label: 'Араалар' },
-  { value: 'kol-shaymandary', label: 'Кол шаймандары' },
-  { value: 'olchoo-shaymandary', label: 'Өлчөө шаймандары' },
-  { value: 'koopsuzduk', label: 'Коопсуздук каражаттары' },
-  { value: 'batareyalar', label: 'Батареялар' },
-  { value: 'shlangtar', label: 'Шлангдар' },
-  { value: 'nasostar', label: 'Насостор' },
-  { value: 'Курулуш материалдары', label: 'Курулуш материалдары' },
-]
+import { useState, useEffect, useTransition } from 'react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Upload,
+  Video,
+  X,
+  RefreshCw,
+  FolderOpen
+} from 'lucide-react'
+import Image from 'next/image'
+import {
+  getProducts,
+  getCategories,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  type Product,
+  type Category
+} from '@/lib/supabase'
 
 export default function AdminProductsPage() {
-  const [products, setProducts] = useState<any[]>([])
-  const [search, setSearch] = useState('')
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('all')
+
+  // Modal & Form States
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadingVideo, setUploadingVideo] = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  // Видео кароо модалы үчүн state
-  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null)
-
-  const [editingProduct, setEditingProduct] = useState<any | null>(null)
-  
-  const [quickPriceEditId, setQuickPriceEditId] = useState<string | null>(null)
-  const [quickPriceValue, setQuickPriceValue] = useState('')
-
-  const [title, setTitle] = useState('')
+  // Form Fields
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [oldPrice, setOldPrice] = useState('')
-  const [stock, setStock] = useState('10')
-  const [isSale, setIsSale] = useState(false)
-  const [videoUrl, setVideoUrl] = useState('')
-  
-  const [category, setCategory] = useState('dreldar')
-  const [isCustomCategory, setIsCustomCategory] = useState(false)
-  const [customCategory, setCustomCategory] = useState('')
+  const [discountPercent, setDiscountPercent] = useState('')
+  const [stock, setStock] = useState('')
+  const [unit, setUnit] = useState('шт')
+  const [categoryId, setCategoryId] = useState('')
+  const [inStock, setInStock] = useState(true)
+  const [isFeatured, setIsFeatured] = useState(false)
+  const [isPopular, setIsPopular] = useState(false)
+  const [isNew, setIsNew] = useState(false)
 
+  // Media States
   const [images, setImages] = useState<string[]>([])
-  const [desc, setDesc] = useState('')
+  const [videoUrl, setVideoUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
 
-  // Supabase'тен жана локалдык файлдан товарларды чогуу алып чыгуу
-  const fetchProducts = async () => {
-    setFetchError(null)
+  // Load Initial Data
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    setLoading(true)
     try {
-      const formattedLocal = (localProducts || []).map((p: any) => ({
-        ...p,
-        title: p.title || p.name || 'Аталышы жок',
-        price: p.price ?? 0,
-        old_price: p.old_price ?? null,
-        stock: p.stock ?? p.quantity ?? 10,
-        isFromDb: false,
-      }))
-
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Supabase катасы:', error)
-        setFetchError(error.message)
-        setProducts(formattedLocal)
-      } else if (data) {
-        const formattedDbProducts = data.map((p: any) => ({
-          ...p,
-          title: p.title || p.name || 'Аталышы жок',
-          price: p.price ?? 0,
-          old_price: p.old_price ?? null,
-          video_url: p.video_url || null,
-          stock: p.stock ?? p.quantity ?? 0,
-          isFromDb: true,
-        }))
-
-        setProducts([...formattedDbProducts, ...formattedLocal])
-      }
-    } catch (err: any) {
-      console.error('Ката:', err)
-      setFetchError(err.message || 'Белгисиз ката')
-      const formattedLocal = (localProducts || []).map((p: any) => ({
-        ...p,
-        title: p.title || p.name || 'Аталышы жок',
-        isFromDb: false,
-      }))
-      setProducts(formattedLocal)
+      const [prods, cats] = await Promise.all([getProducts(), getCategories()])
+      setProducts(prods)
+      setCategories(cats)
+    } catch (err) {
+      console.error('Маалыматтарды жүктөөдө ката чыкты:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchProducts()
-  }, [])
-
-  const getCategoryLabel = (catKey: string) => {
-    if (!catKey) return 'Жалпы'
-    const cleanKey = catKey.trim().toLowerCase()
-    if (CATEGORY_MAP[cleanKey]) return CATEGORY_MAP[cleanKey]
-    return catKey.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
-  }
-
+  // Handle Form Reset
   const resetForm = () => {
-    setTitle('')
+    setName('')
+    setDescription('')
     setPrice('')
     setOldPrice('')
-    setStock('10')
-    setIsSale(false)
-    setVideoUrl('')
-    setCategory('dreldar')
-    setIsCustomCategory(false)
-    setCustomCategory('')
+    setDiscountPercent('')
+    setStock('')
+    setUnit('шт')
+    setCategoryId('')
+    setInStock(true)
+    setIsFeatured(false)
+    setIsPopular(false)
+    setIsNew(false)
     setImages([])
-    setDesc('')
+    setVideoUrl('')
     setEditingProduct(null)
   }
 
-  const handleOpenAddModal = () => {
-    resetForm()
-    setIsModalOpen(true)
-  }
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    resetForm()
-  }
-
-  const handleOpenEditModal = (product: any) => {
-    setEditingProduct(product)
-    setTitle(product.title || product.name || '')
-    setPrice(product.price?.toString() || '')
-    setOldPrice(product.old_price?.toString() || '')
-    setStock((product.stock ?? product.quantity ?? 0).toString())
-    setIsSale(product.is_sale || false)
-    setVideoUrl(product.video_url || '')
-    
-    const prodCat = product.category || 'dreldar'
-    const existsInOptions = INITIAL_CATEGORY_OPTIONS.some(o => o.value === prodCat)
-
-    if (existsInOptions) {
-      setCategory(prodCat)
-      setIsCustomCategory(false)
-      setCustomCategory('')
+  const handleOpenModal = (product?: Product) => {
+    if (product) {
+      setEditingProduct(product)
+      setName(product.name || '')
+      setDescription(product.description || '')
+      setPrice(product.price ? product.price.toString() : '')
+      setOldPrice(product.old_price ? product.old_price.toString() : '')
+      setDiscountPercent(product.discount_percent ? product.discount_percent.toString() : '')
+      setStock(product.stock ? product.stock.toString() : '')
+      setUnit(product.unit || 'шт')
+      setCategoryId(product.category_id || '')
+      setInStock(product.in_stock ?? true)
+      setIsFeatured(product.is_featured ?? false)
+      setIsPopular(product.is_popular ?? false)
+      setIsNew(product.is_new ?? false)
+      setImages(product.images || [])
+      setVideoUrl(product.video_url || '')
     } else {
-      setCategory('NEW_CUSTOM')
-      setIsCustomCategory(true)
-      setCustomCategory(prodCat)
+      resetForm()
     }
-
-    let initialImages: string[] = []
-    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
-      initialImages = product.images
-    } else if (product.image_url) {
-      initialImages = [product.image_url]
-    }
-
-    setImages(initialImages)
-    setDesc(product.description || '')
     setIsModalOpen(true)
   }
 
+  // ☁️ CLOUDINARY'ГЕ СҮРӨТ ЖҮКТӨӨ (Параллель жүктөө кошулду)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -207,518 +128,630 @@ export default function AdminProductsPage() {
 
     setUploading(true)
     const filesToUpload = Array.from(files).slice(0, remainingSlots)
-    const uploadedUrls: string[] = []
 
-    for (const file of filesToUpload) {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`
+    const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dnd1pmsyl'
+    const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'ml_default'
 
-      const { error: uploadError } = await supabase.storage
-        .from('products')
-        .upload(fileName, file)
+    try {
+      const uploadPromises = filesToUpload.map(async (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('upload_preset', UPLOAD_PRESET)
 
-      if (uploadError) {
-        alert('Сүрөт жүктөөдө ката: ' + uploadError.message)
-        continue
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+          method: 'POST',
+          body: formData,
+        })
+        const data = await res.json()
+        return data.secure_url ? data.secure_url : null
+      })
+
+      const uploadedUrls = (await Promise.all(uploadPromises)).filter(Boolean) as string[]
+
+      if (uploadedUrls.length > 0) {
+        setImages((prev) => [...prev, ...uploadedUrls].slice(0, 5))
       }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('products')
-        .getPublicUrl(fileName)
-
-      if (publicUrlData?.publicUrl) {
-        uploadedUrls.push(publicUrlData.publicUrl)
-      }
+    } catch (err) {
+      console.error('Ката:', err)
+      alert('Сүрөт жүктөөдө ката чыкты!')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
     }
-
-    setImages((prev) => [...prev, ...uploadedUrls].slice(0, 5))
-    setUploading(false)
-    e.target.value = ''
   }
 
+  // 🎥 CLOUDINARY'ГЕ ВИДЕО ЖҮКТӨӨ
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setUploadingVideo(true)
-    const fileExt = file.name.split('.').pop()
-    const fileName = `video-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`
 
-    const { error: uploadError } = await supabase.storage
-      .from('products')
-      .upload(fileName, file)
+    const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dnd1pmsyl'
+    const UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'ml_default'
 
-    if (uploadError) {
-      alert('Видео жүктөөдө ката чыкты: ' + uploadError.message)
-      setUploadingVideo(false)
-      return
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('products')
-      .getPublicUrl(fileName)
-
-    if (publicUrlData?.publicUrl) {
-      setVideoUrl(publicUrlData.publicUrl)
-      alert('Видео ийгиликтүү жүктөлдү!')
-    }
-    setUploadingVideo(false)
-    e.target.value = ''
-  }
-
-  const handleSaveProduct = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title || !price) {
-      alert('Товардын атын жана баасын сөзсүз жазыңыз!')
-      return
-    }
-
-    const finalCategory = isCustomCategory ? (customCategory.trim() || 'Жалпы') : category
-    const stockNum = Math.max(0, parseInt(stock) || 0)
-
-    setLoading(true)
-    const imagesToSave = images.length > 0 ? images : ['/placeholder.jpg']
-
-    const payload = {
-      name: title,
-      title: title,
-      price: Number(price),
-      old_price: oldPrice ? Number(oldPrice) : null,
-      stock: stockNum,
-      is_sale: isSale,
-      video_url: videoUrl ? videoUrl.trim() : null,
-      category: finalCategory,
-      image_url: imagesToSave[0],
-      images: imagesToSave,
-      description: desc,
-    }
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', UPLOAD_PRESET)
 
     try {
-      if (editingProduct && editingProduct.isFromDb) {
-        const { error } = await supabase
-          .from('products')
-          .update(payload)
-          .eq('id', editingProduct.id)
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`, {
+        method: 'POST',
+        body: formData,
+      })
 
-        if (error) {
-          alert('Өзгөртүүдө ката: ' + error.message)
-        } else {
-          alert('Товар ийгиликтүү өзгөртүлдү!')
-          handleCloseModal()
-          fetchProducts()
-        }
+      const data = await res.json()
+
+      if (data.secure_url) {
+        setVideoUrl(data.secure_url)
+        alert('Видео ийгиликтүү жүктөлдү!')
       } else {
-        const { error } = await supabase.from('products').insert([payload])
-
-        if (error) {
-          alert('Сактоодо ката чыкты: ' + error.message)
-        } else {
-          alert('Жаңы товар ийгиликтүү сакталды!')
-          handleCloseModal()
-          fetchProducts()
-        }
+        alert('Видео жүктөөдө ката: ' + (data.error?.message || 'Белгисиз ката'))
       }
-    } catch (err: any) {
-      alert('Сактоодо ката: ' + (err.message || ''))
+    } catch (err) {
+      console.error('Ката:', err)
+      alert('Видео жүктөөдө ката чыкты!')
     } finally {
-      setLoading(false)
+      setUploadingVideo(false)
+      e.target.value = ''
     }
   }
 
-  const handleQuickPriceSave = async (id: string, isFromDb?: boolean) => {
-    if (!quickPriceValue || isNaN(Number(quickPriceValue))) return
-    const newPriceNum = Number(quickPriceValue)
-
-    if (isFromDb) {
-      await supabase.from('products').update({ price: newPriceNum }).eq('id', id)
-    }
-
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, price: newPriceNum } : p))
-    setQuickPriceEditId(null)
+  const handleRemoveImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleDeleteProduct = async (id: string, isFromDb?: boolean) => {
-    if (confirm('Бул товарды өчүрүүнү каалайсызбы?')) {
-      if (isFromDb) {
-        const { error } = await supabase.from('products').delete().eq('id', id)
-        if (error) {
-          alert('Өчүрүүдө ката: ' + error.message)
-          return
+  const handleRemoveVideo = () => {
+    setVideoUrl('')
+  }
+
+  // Automatic Calculation for Discount
+  const handlePriceChange = (v: string) => {
+    setPrice(v)
+    const p = parseFloat(v)
+    const op = parseFloat(oldPrice)
+    if (p && op && op > p) {
+      const disc = Math.round(((op - p) / op) * 100)
+      setDiscountPercent(disc.toString())
+    } else {
+      setDiscountPercent('')
+    }
+  }
+
+  const handleOldPriceChange = (v: string) => {
+    setOldPrice(v)
+    const op = parseFloat(v)
+    const p = parseFloat(price)
+    if (p && op && op > p) {
+      const disc = Math.round(((op - p) / op) * 100)
+      setDiscountPercent(disc.toString())
+    } else {
+      setDiscountPercent('')
+    }
+  }
+
+  // Handle Form Submit
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!name || !price) {
+      alert('Аты жана баасы сөзсүз толукталышы керек!')
+      return
+    }
+
+    const payload = {
+      name,
+      description,
+      price: parseFloat(price) || 0,
+      old_price: oldPrice ? parseFloat(oldPrice) : null,
+      discount_percent: discountPercent ? parseInt(discountPercent) : null,
+      stock: stock ? parseInt(stock) : 0,
+      unit,
+      category_id: categoryId || null,
+      in_stock: inStock,
+      is_featured: isFeatured,
+      is_popular: isPopular,
+      is_new: isNew,
+      images,
+      video_url: videoUrl || null,
+    }
+
+    startTransition(async () => {
+      try {
+        if (editingProduct) {
+          await updateProduct(editingProduct.id, payload)
+        } else {
+          await createProduct(payload)
         }
+        setIsModalOpen(false)
+        resetForm()
+        await loadData()
+      } catch (err) {
+        console.error('Сактоодо ката чыкты:', err)
+        alert('Сактоодо ката чыкты, кайра аракет кылыңыз!')
       }
-      setProducts(products.filter((p) => p.id !== id))
+    })
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Бул товарды өчүрүүнү каалайсызбы?')) return
+
+    try {
+      await deleteProduct(id)
+      await loadData()
+    } catch (err) {
+      console.error('Өчүрүүдө ката чыкты:', err)
+      alert('Товарды өчүрүү мүмкүн болбоду!')
     }
   }
 
+  // Filter Products
   const filteredProducts = products.filter((p) => {
-    const t = (p.title || p.name || '').toLowerCase()
-    const c = getCategoryLabel(p.category).toLowerCase()
-    const q = search.toLowerCase()
-    return t.includes(q) || c.includes(q)
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory =
+      selectedCategoryFilter === 'all' || p.category_id === selectedCategoryFilter
+    return matchesSearch && matchesCategory
   })
 
   return (
     <div className="space-y-6">
-      {/* HEADER */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-mono text-2xl font-bold uppercase tracking-wide flex items-center gap-2">
-            Товарларды башкаруу <Sparkles className="size-5 text-amber-400" />
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Бааларды өзгөртүү, видео кошуу жана склад калдыгын көзөмөлдөө.
+          <h1 className="text-2xl font-bold text-gray-900">Товарларды башкаруу</h1>
+          <p className="text-sm text-gray-500">
+            Бардык товарлардын тизмесин көрүү, жаңы кошуу же өзгөртүү
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={fetchProducts} variant="outline" className="rounded-xl gap-2 border-border/60">
-            <RefreshCw className="size-4" /> Кайра жаңылоо
-          </Button>
-          <Button onClick={handleOpenAddModal} className="rounded-xl gap-2 font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-lg shadow-amber-500/20">
-            <Plus className="size-4" /> Жаңы товар кошуу
-          </Button>
+        <button
+          onClick={() => handleOpenModal()}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+        >
+          <Plus className="h-5 w-5" />
+          Жаңы товар кошуу
+        </button>
+      </div>
+
+      {/* Filters & Search */}
+      <div className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm border border-gray-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Товарларды издөө..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50/50 pl-10 pr-4 py-2 text-sm text-gray-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedCategoryFilter}
+            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+            className="rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-500/20"
+          >
+            <option value="all">Бардык категориялар</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={loadData}
+            title="Жаңыртуу"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
 
-      {fetchError && (
-        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
-          ⚠️ <strong>Базага байланышууда ката:</strong> {fetchError}
-        </div>
-      )}
+      {/* Products Table */}
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="h-6 w-6 animate-spin text-amber-500" />
+            <span className="ml-2 text-sm text-gray-500">Жүктөлүүдө...</span>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <FolderOpen className="h-12 w-12 text-gray-300" />
+            <p className="mt-2 text-sm font-medium text-gray-900">Товарлар табылган жок</p>
+            <p className="text-xs text-gray-500">
+              Издөө шарттарын өзгөртүңүз же жаңы товар кошуңуз.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50/50 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <tr>
+                  <th className="px-6 py-4">Товар</th>
+                  <th className="px-6 py-4">Категория</th>
+                  <th className="px-6 py-4">Баасы</th>
+                  <th className="px-6 py-4">Складда</th>
+                  <th className="px-6 py-4">Статус</th>
+                  <th className="px-6 py-4 text-right">Аракеттер</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 border-t border-gray-100">
+                {filteredProducts.map((p) => {
+                  const cat = categories.find((c) => c.id === p.category_id)
+                  const mainImage = p.images && p.images.length > 0 ? p.images[0] : null
 
-      {/* ИЗДӨӨ */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Издөө..." className="pl-10 rounded-xl bg-card border-border/60" />
-      </div>
-
-      {/* ТАБЛИЦА */}
-      <div className="rounded-2xl border border-border/50 bg-card shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-border/60 bg-muted/40 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <tr>
-                <th className="p-4">Сүрөт / Видео</th>
-                <th className="p-4">Аталышы</th>
-                <th className="p-4">Категория</th>
-                <th className="p-4">Складда</th>
-                <th className="p-4">Баасы</th>
-                <th className="p-4">Статус</th>
-                <th className="p-4 text-center">Аракеттер</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {filteredProducts.map((product) => {
-                const imgSource = product.image_url || product.image || product.images?.[0]
-                const isQuickEditing = quickPriceEditId === product.id
-                const stockCount = product.stock ?? product.quantity ?? 0
-
-                return (
-                  <tr key={product.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="p-4">
-                      <div className="size-12 rounded-xl bg-muted/60 flex items-center justify-center overflow-hidden border border-border/40 relative group">
-                        {imgSource ? (
-                          <img src={imgSource} alt="" className="size-full object-cover" />
-                        ) : (
-                          <ImageIcon className="size-5 text-muted-foreground" />
-                        )}
-                        {product.video_url && (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewVideoUrl(product.video_url)}
-                            className="absolute inset-0 bg-black/50 flex items-center justify-center text-rose-500 hover:scale-110 transition cursor-pointer"
-                            title="Видеосун көрүү"
-                          >
-                            <Video className="size-5 fill-rose-500 text-white" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="p-4 font-medium max-w-xs truncate text-foreground">
-                      {product.title || product.name || 'Аталышы жок'}
-                    </td>
-
-                    <td className="p-4 font-semibold text-amber-400">
-                      {getCategoryLabel(product.category)}
-                    </td>
-
-                    <td className="p-4 font-mono font-bold">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                        stockCount > 5 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                          : stockCount > 0 
-                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      }`}>
-                        <Box className="size-3.5" />
-                        {stockCount} даана
-                      </span>
-                    </td>
-
-                    <td className="p-4 font-mono font-bold">
-                      {isQuickEditing ? (
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            type="number"
-                            value={quickPriceValue}
-                            onChange={(e) => setQuickPriceValue(e.target.value)}
-                            className="w-24 h-8 text-xs font-bold rounded-lg border-amber-500"
-                            autoFocus
-                          />
-                          <Button size="icon" className="size-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg" onClick={() => handleQuickPriceSave(product.id, product.isFromDb)}>
-                            <Check className="size-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="size-8 rounded-lg" onClick={() => setQuickPriceEditId(null)}>
-                            <X className="size-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div
-                          className="inline-flex items-center gap-2 cursor-pointer hover:text-amber-400 transition group p-1.5 -m-1.5 rounded-lg hover:bg-amber-400/10"
-                          onClick={() => {
-                            setQuickPriceEditId(product.id)
-                            setQuickPriceValue(product.price?.toString() || '')
-                          }}
-                        >
-                          <div>
-                            <span className="text-base text-foreground group-hover:text-amber-400">{formatSom(product.price || 0)}</span>
-                            {product.old_price && (
-                              <span className="block text-xs line-through text-muted-foreground font-normal">
-                                {formatSom(product.old_price)}
-                              </span>
+                  return (
+                    <tr key={p.id} className="transition hover:bg-gray-50/50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                            {mainImage ? (
+                              <Image
+                                src={mainImage}
+                                alt={p.name}
+                                fill
+                                priority // <-- LCP эскертүүсүн өчүрүү үчүн кошулду
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                                Сүрөт жок
+                              </div>
                             )}
                           </div>
-                          <Edit3 className="size-3.5 text-amber-500 opacity-40 group-hover:opacity-100 transition" />
+                          <div>
+                            <div className="font-medium text-gray-900">{p.name}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {p.is_featured && (
+                                <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                  Тандалган
+                                </span>
+                              )}
+                              {p.is_popular && (
+                                <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                                  Популярдуу
+                                </span>
+                              )}
+                              {p.is_new && (
+                                <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700">
+                                  Жаңы
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </td>
-
-                    <td className="p-4">
-                      {product.is_sale && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-400 border border-emerald-500/20">
-                          <Percent className="size-3" /> Акция
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="p-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(product)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-xl transition cursor-pointer"
-                        >
-                          <Edit3 className="size-3.5" />
-                          Оңдоо
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteProduct(product.id, product.isFromDb)}
-                          className="flex items-center justify-center p-2 text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-xl transition cursor-pointer"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {cat ? cat.name : <span className="text-gray-400">—</span>}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-gray-900">{p.price} сом</div>
+                        {p.old_price && (
+                          <div className="text-xs text-gray-400 line-through">
+                            {p.old_price} сом
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {p.stock} {p.unit}
+                      </td>
+                      <td className="px-6 py-4">
+                        {p.in_stock ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Бар
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                            Түгөнүп калды
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleOpenModal(p)}
+                            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-amber-600"
+                            title="Өзгөртүү"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(p.id)}
+                            className="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-rose-600"
+                            title="Өчүрүү"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* 🎬 ВИДЕО КӨРҮҮ МОДАЛЫ (ҮНҮ ДАЯРЖАНА АРТКА ЖАБУУ КНОПКАСЫ БАР) */}
-      {previewVideoUrl && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
-          onClick={() => setPreviewVideoUrl(null)}
-        >
-          <div 
-            className="relative w-full max-w-3xl bg-slate-900/90 rounded-3xl p-2 border border-slate-800 shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* АРТКА ЖАНА ЖАБУУ КНОПКАСЫ */}
-            <button
-              type="button"
-              onClick={() => setPreviewVideoUrl(null)}
-              className="absolute top-4 right-4 z-30 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/70 hover:bg-rose-600 text-white text-xs font-bold transition shadow-lg backdrop-blur-sm cursor-pointer border border-white/20"
-            >
-              <X className="size-4" />
-              <span>Жабуу (Артка)</span>
-            </button>
-
-            {/* ВИДЕО ПЛЕЕР */}
-            <video
-              src={previewVideoUrl}
-              controls
-              autoPlay={false}
-              muted={false}
-              playsInline
-              className="w-full h-auto max-h-[80vh] rounded-2xl relative z-10"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* ТОВАР КОШУУ / ОҢДОО МОДАЛДЫК ТЕРЕЗЕСИ */}
+      {/* Modal Form */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 sm:p-6 overflow-hidden animate-in fade-in duration-200">
-          <div className="relative flex flex-col w-full max-w-2xl max-h-[90vh] rounded-3xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 bg-muted/30 shrink-0">
-              <h2 className="font-bold text-lg text-amber-400 flex items-center gap-2">
-                {editingProduct ? <Edit3 className="size-5" /> : <Plus className="size-5" />}
-                {editingProduct ? 'Товар маалыматын оңдоо' : 'Жаңы товар кошуу'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                {editingProduct ? 'Товарды өзгөртүү' : 'Жаңы товар кошуу'}
               </h2>
-              <Button variant="ghost" size="icon" onClick={handleCloseModal} className="rounded-full hover:bg-muted">
-                <X className="size-5" />
-              </Button>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              <form id="product-form" onSubmit={handleSaveProduct} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Товардын аты *</label>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} required className="mt-1.5 rounded-xl border-border/60" />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Категория *</label>
-                    <div className="mt-1.5 space-y-2">
-                      <select
-                        value={isCustomCategory ? 'NEW_CUSTOM' : category}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          if (val === 'NEW_CUSTOM') {
-                            setIsCustomCategory(true)
-                          } else {
-                            setIsCustomCategory(false)
-                            setCategory(val)
-                          }
-                        }}
-                        className="w-full h-10 rounded-xl border border-border/60 bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      >
-                        {INITIAL_CATEGORY_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                        <option value="NEW_CUSTOM" className="font-bold text-amber-500">
-                          + Жаңы категория кошуу...
-                        </option>
-                      </select>
-
-                      {isCustomCategory && (
-                        <Input
-                          placeholder="Жаңы категориянын атын жазыңыз..."
-                          value={customCategory}
-                          onChange={(e) => setCustomCategory(e.target.value)}
-                          required
-                          className="rounded-xl border-amber-500/60 bg-amber-500/5 text-amber-400 font-semibold"
-                          autoFocus
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 sm:col-span-2 grid gap-4 sm:grid-cols-3 items-end">
-                    <div>
-                      <label className="text-xs font-bold text-foreground">Жаңы баасы (сом) *</label>
-                      <Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} required className="mt-1 rounded-xl font-bold text-base border-amber-500/40" />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-muted-foreground">Эски баасы</label>
-                      <Input type="number" value={oldPrice} onChange={(e) => setOldPrice(e.target.value)} placeholder="0" className="mt-1 rounded-xl border-border/60" />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-bold text-emerald-400 flex items-center gap-1">
-                        <Box className="size-3.5" /> Складдагы саны *
-                      </label>
-                      <Input 
-                        type="number" 
-                        value={stock} 
-                        onChange={(e) => setStock(e.target.value)} 
-                        required 
-                        min="0"
-                        className="mt-1 rounded-xl font-bold border-emerald-500/40 text-emerald-400 bg-emerald-500/5" 
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 sm:col-span-3 pt-2">
-                      <input type="checkbox" id="modalIsSale" checked={isSale} onChange={(e) => setIsSale(e.target.checked)} className="size-5 rounded border-gray-600 text-amber-500 focus:ring-amber-500 cursor-pointer" />
-                      <label htmlFor="modalIsSale" className="text-xs font-bold uppercase text-emerald-400 cursor-pointer flex items-center gap-1">
-                        <Percent className="size-4" /> Акцияда
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="sm:col-span-2 p-4 rounded-2xl border border-dashed border-border/80 bg-muted/20 space-y-2">
-                    <label className="text-xs font-semibold text-foreground flex items-center justify-between">
-                      <span className="flex items-center gap-2">
-                        <Video className="size-4 text-rose-500" />
-                        Видео кошуу (Шилтеме же файл жүктөө):
-                      </span>
-                      {videoUrl && <span className="text-emerald-400 text-[10px] font-bold">✓ Видео даяр</span>}
-                    </label>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      <Input 
-                        value={videoUrl} 
-                        onChange={(e) => setVideoUrl(e.target.value)} 
-                        placeholder="https://... видео шилтемеси" 
-                        className="rounded-xl text-xs flex-1 border-border/60" 
-                      />
-                      <label className={`flex items-center justify-center gap-1.5 px-4 h-10 rounded-xl border border-border bg-card hover:bg-muted cursor-pointer transition text-xs font-semibold ${uploadingVideo ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <Upload className="size-3.5" />
-                        <span>{uploadingVideo ? 'Жүктөлүүдө...' : 'Видео файл'}</span>
-                        <input type="file" accept="video/*" disabled={uploadingVideo} onChange={handleVideoUpload} className="hidden" />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 rounded-2xl border border-dashed border-border/80 p-4 bg-muted/20">
-                  <label className="text-xs font-semibold uppercase text-muted-foreground flex justify-between">
-                    <span>Сүрөттөр (Макс 5):</span>
-                    <span className="text-amber-400 font-bold">{images.length}/5</span>
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+              {/* Name & Category */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">
+                    Товардын аты *
                   </label>
-                  <div className="flex flex-wrap gap-3">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="relative size-20 rounded-xl overflow-hidden border border-border bg-background group">
-                        <img src={img} alt="" className="size-full object-cover" />
-                        <button type="button" onClick={() => setImages(images.filter((_, i) => i !== idx))} className="absolute top-1 right-1 rounded-full bg-rose-600 p-1 text-white shadow">
-                          <X className="size-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {images.length < 5 && (
-                      <label className={`flex size-20 flex-col items-center justify-center rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 cursor-pointer text-amber-500 transition ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <Upload className="size-5" />
-                        <span className="text-[10px] font-semibold mt-1">{uploading ? '...' : 'Тандоо'}</span>
-                        <input type="file" accept="image/*" multiple disabled={uploading} onChange={handleFileUpload} className="hidden" />
-                      </label>
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="Мисалы: Цемент М500"
+                  />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Сүрөттөмө</label>
-                  <textarea value={desc} onChange={(e) => setDesc(e.target.value)} className="mt-1.5 w-full rounded-xl border border-border/60 bg-background p-3 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500" rows={3} />
+                  <label className="block text-xs font-medium text-gray-700">Категория</label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                  >
+                    <option value="">Тандаңыз...</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </form>
-            </div>
+              </div>
 
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-border/60 bg-muted/30 shrink-0">
-              <Button type="button" variant="outline" onClick={handleCloseModal} className="rounded-xl border-border/60">
-                Токтотуу
-              </Button>
-              <Button type="submit" form="product-form" disabled={loading} className="rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 px-6 shadow-lg shadow-amber-500/20">
-                {loading ? 'Сакталууда...' : 'Сактоо'}
-              </Button>
-            </div>
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700">Мүнөздөмөсү</label>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                  placeholder="Товар жөнүндө толугураак..."
+                />
+              </div>
+
+              {/* Price, Old Price, Discount */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">
+                    Баасы (сом) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={price}
+                    onChange={(e) => handlePriceChange(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="350"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">
+                    Мурдагы баасы (эгер арзандатуу болсо)
+                  </label>
+                  <input
+                    type="number"
+                    value={oldPrice}
+                    onChange={(e) => handleOldPriceChange(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">
+                    Арзандатуу (%)
+                  </label>
+                  <input
+                    type="number"
+                    value={discountPercent}
+                    onChange={(e) => setDiscountPercent(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="12"
+                  />
+                </div>
+              </div>
+
+              {/* Stock & Unit */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">
+                    Складдагы саны
+                  </label>
+                  <input
+                    type="number"
+                    value={stock}
+                    onChange={(e) => setStock(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    placeholder="100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">Өлчөм бирдиги</label>
+                  <select
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                  >
+                    <option value="шт">шт (даана)</option>
+                    <option value="кг">кг (килограмм)</option>
+                    <option value="т">т (тонна)</option>
+                    <option value="м">м (метр)</option>
+                    <option value="м²">м² (кв. метр)</option>
+                    <option value="м³">м³ (куб. метр)</option>
+                    <option value="пачка">пачка</option>
+                    <option value="мешок">мешок</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Checkboxes */}
+              <div className="flex flex-wrap gap-4 pt-2 border-t border-gray-100">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={inStock}
+                    onChange={(e) => setInStock(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  Складда бар
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isFeatured}
+                    onChange={(e) => setIsFeatured(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  Тандалган (Featured)
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPopular}
+                    onChange={(e) => setIsPopular(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  Популярдуу
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isNew}
+                    onChange={(e) => setIsNew(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                  />
+                  Жаңы
+                </label>
+              </div>
+
+              {/* Cloudinary Image Upload Section */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="block text-xs font-medium text-gray-700">
+                  Сүрөттөр (Максимум 5 сүрөт)
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {images.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className="relative h-20 w-20 overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                    >
+                      <Image src={img} alt="" fill className="object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {images.length < 5 && (
+                    <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/50 text-gray-400 hover:border-amber-500 hover:text-amber-500">
+                      <Upload className="h-5 w-5" />
+                      <span className="mt-1 text-[10px]">
+                        {uploading ? 'Жүктөлүүдө...' : 'Кошуу'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Cloudinary Video Upload Section */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="block text-xs font-medium text-gray-700">Видео (Кааласаңыз)</label>
+                {videoUrl ? (
+                  <div className="flex items-center justify-between rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <div className="flex items-center gap-2 overflow-hidden text-xs text-gray-600">
+                      <Video className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                      <span className="truncate">{videoUrl}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveVideo}
+                      className="text-rose-500 hover:text-rose-700 text-xs font-medium"
+                    >
+                      Өчүрүү
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 p-4 text-xs font-medium text-gray-500 hover:border-amber-500 hover:text-amber-500">
+                    <Video className="h-4 w-4" />
+                    <span>
+                      {uploadingVideo ? 'Видео жүктөлүүдө...' : 'Видео файл кошуу (Cloudinary)'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoUpload}
+                      disabled={uploadingVideo}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Жабуу
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending || uploading || uploadingVideo}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {isPending ? 'Сакталууда...' : editingProduct ? 'Өзгөртүү' : 'Сактоо'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
