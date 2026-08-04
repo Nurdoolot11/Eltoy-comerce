@@ -104,27 +104,27 @@ export function ProductDetail({ product }: { product: any }) {
   const isIframeVideo = videoUrl && (videoUrl.includes('instagram.com') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))
 
   return (
-    <div className="container-px relative mx-auto max-w-7xl py-8">
-      <p className="mb-6 text-sm text-muted-foreground">Каталог / {getBrandName(product.brand)} / {productName}</p>
+    <div className="container-px relative mx-auto max-w-7xl pb-24 pt-4 md:py-8">
+      <p className="mb-4 text-xs md:text-sm text-muted-foreground">Каталог / {getBrandName(product.brand)} / {productName}</p>
       
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Сол тарап: Башкы сүрөт + Pinduoduo стилиндеги видео карточка */}
-        <div className="flex flex-col gap-4">
-          <div className="relative aspect-square overflow-hidden rounded-3xl bg-secondary/40">
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
+        {/* Сол тарап: Башкы сүрөт + Видео карточка */}
+        <div className="flex flex-col gap-3">
+          <div className="relative aspect-square overflow-hidden rounded-3xl bg-secondary/30 border border-border/50">
             <img 
               src={active} 
               alt={productName} 
-              className="h-full w-full object-contain p-8"
+              className="h-full w-full object-contain p-6 md:p-8"
               onError={(e) => {
                 ;(e.target as HTMLImageElement).src = '/placeholder.svg'
               }}
             />
 
-            {/* 🎬 PINDUODUO СТИЛИНДЕГИ КИЧИНЕКЕЙ ВЕРТИКАЛДУУ ВИДЕО КАРТОЧКА */}
+            {/* 🎬 PINDUODUO СТИЛИНДЕГИ ВЕРТИКАЛДУУ ВИДЕО КАРТОЧКА */}
             {videoUrl && (
               <div 
                 onClick={() => setIsVideoModalOpen(true)}
-                className="group absolute bottom-4 right-4 z-10 flex h-36 w-24 cursor-pointer overflow-hidden rounded-2xl border-2 border-white/90 bg-black shadow-2xl transition-all duration-300 hover:scale-105 hover:border-primary md:h-44 md:w-28"
+                className="group absolute bottom-3 right-3 z-10 flex h-32 w-20 cursor-pointer overflow-hidden rounded-2xl border-2 border-white/90 bg-black shadow-2xl transition-all duration-300 hover:scale-105 hover:border-primary md:h-44 md:w-28"
                 title="Чоңойтуп көрүү үчүн басыңыз"
               >
                 {isIframeVideo ? (
@@ -146,16 +146,14 @@ export function ProductDetail({ product }: { product: any }) {
                   />
                 )}
 
-                {/* Басканга чакырган Play сөлөкөтү */}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/10">
-                  <div className="flex size-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-110">
-                    <Play className="ml-0.5 size-4 fill-white" />
+                  <div className="flex size-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform group-hover:scale-110 md:size-9">
+                    <Play className="ml-0.5 size-3.5 md:size-4 fill-white" />
                   </div>
                 </div>
 
-                {/* Чоңойтуу сөлөкөтү */}
                 <div className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white opacity-80 backdrop-blur-md">
-                  <Maximize2 className="size-3" />
+                  <Maximize2 className="size-2.5 md:size-3" />
                 </div>
               </div>
             )}
@@ -163,17 +161,17 @@ export function ProductDetail({ product }: { product: any }) {
 
           {/* Галерея */}
           {galleryImages.length > 1 && (
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-2 md:gap-3">
               {galleryImages.map((src: string, i: number) => (
                 <button 
                   key={`${src}-${i}`} 
                   onClick={() => setActive(src)} 
-                  className={`relative aspect-square overflow-hidden rounded-xl border bg-secondary/40 transition ${active === src ? 'ring-2 ring-primary' : ''}`}
+                  className={`relative aspect-square overflow-hidden rounded-xl border bg-secondary/30 transition ${active === src ? 'ring-2 ring-primary border-primary' : 'border-border'}`}
                 >
                   <img 
                     src={src} 
                     alt={`${productName} ${i+1}`} 
-                    className="h-full w-full object-contain p-2"
+                    className="h-full w-full object-contain p-1.5"
                     onError={(e) => {
                       ;(e.target as HTMLImageElement).src = '/placeholder.svg'
                     }}
@@ -185,74 +183,82 @@ export function ProductDetail({ product }: { product: any }) {
         </div>
         
         {/* Оң тарап: Маалыматтар */}
-        <div className="flex flex-col gap-6 lg:py-4">
+        <div className="flex flex-col gap-5 lg:py-2">
           <div>
-            <p className="font-mono uppercase tracking-widest text-primary">{getBrandName(product.brand)}</p>
-            <h1 className="mt-2 text-balance font-mono text-3xl font-bold uppercase md:text-5xl">{productName}</h1>
-            <div className="mt-3 flex items-center gap-3 text-sm">
-              <span className="flex items-center gap-1"><Star className="size-4 fill-primary text-primary"/>{productRating}</span>
+            <p className="font-mono text-xs uppercase tracking-widest text-primary font-semibold">{getBrandName(product.brand)}</p>
+            <h1 className="mt-1 text-2xl font-bold uppercase tracking-tight md:text-4xl">{productName}</h1>
+            <div className="mt-2.5 flex items-center gap-3 text-xs md:text-sm">
+              <span className="flex items-center gap-1 font-semibold text-amber-500"><Star className="size-4 fill-amber-500 text-amber-500"/>{productRating}</span>
               <span className="text-muted-foreground">{product.reviewsCount || productReviews.length} пикир</span>
               <span className="text-muted-foreground">SKU: {product.sku || product.id?.slice(0, 8)}</span>
             </div>
           </div>
           
-          <p className="leading-relaxed text-muted-foreground">{product.description || 'Товардын сүрөттөмөсү даярдалууда.'}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground md:text-base">{product.description || 'Товардын сүрөттөмөсү даярдалууда.'}</p>
           
-          <div className="flex items-end gap-3">
-            <strong className="text-3xl">{formatSom(product.price || 0)}</strong>
-            {product.oldPrice && <span className="text-lg text-muted-foreground line-through">{formatSom(product.oldPrice)}</span>}
-          </div>
-          
-          <p className="flex items-center gap-2 text-sm">
-            <Check className="size-4 text-primary"/>
-            {productStock > 0 ? `Складда ${productStock} даана бар` : 'Түгөндү'}
-          </p>
-          
-          {/* САНЫ ЖАНА КНОПКАЛАР (СЕБЕТ, ЖҮРӨКЧӨ, САЛЫШТЫРУУ) */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center rounded-full border bg-background">
-              <Button variant="ghost" size="icon" className="rounded-l-full" onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus/></Button>
-              <span className="w-10 text-center font-bold">{quantity}</span>
-              <Button variant="ghost" size="icon" className="rounded-r-full" onClick={() => setQuantity(Math.min(productStock || 99, quantity + 1))}><Plus/></Button>
+          {/* Баасы жана Баскычтар (Избранный / Салыштыруу) */}
+          <div className="flex items-center justify-between rounded-2xl bg-secondary/30 p-3.5 md:p-4 border border-border/50">
+            <div className="flex items-baseline gap-2">
+              <strong className="text-2xl font-extrabold md:text-3xl">{formatSom(product.price || 0)}</strong>
+              {product.oldPrice && <span className="text-sm text-muted-foreground line-through">{formatSom(product.oldPrice)}</span>}
             </div>
 
-            <Button size="lg" className="flex-1 rounded-full font-bold" onClick={() => addToCart(product.id, quantity)}>
+            {/* Мобилдик версияда да, ЖКде да так көрүнүүчү Жүрөкчө жана Салыштыруу баскычтары */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toggleWishlist(product.id)}
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-full border border-border bg-background transition hover:bg-primary hover:text-primary-foreground",
+                  inWishlist && "bg-primary text-primary-foreground border-primary"
+                )}
+                aria-label="Избранныйга кошуу"
+              >
+                <Heart className={cn("size-5", inWishlist && "fill-current")} />
+              </button>
+
+              <button
+                onClick={() => toggleCompare(product.id)}
+                className={cn(
+                  "flex size-10 items-center justify-center rounded-full border border-border bg-background transition hover:bg-primary hover:text-primary-foreground",
+                  inCompare && "bg-primary text-primary-foreground border-primary"
+                )}
+                aria-label="Салыштырууга кошуу"
+              >
+                <GitCompareArrows className="size-5" />
+              </button>
+            </div>
+          </div>
+          
+          <p className="flex items-center gap-2 text-xs font-medium md:text-sm">
+            <Check className="size-4 text-emerald-500"/>
+            {productStock > 0 ? `Складда ${productStock} даана бар` : <span className="text-destructive">Түгөндү</span>}
+          </p>
+          
+          {/* САНЫ ЖАНА СЕБЕТКЕ КОШУУ */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex h-12 items-center rounded-full border border-border bg-background px-1 shadow-sm">
+              <Button variant="ghost" size="icon" className="size-10 rounded-full" onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus className="size-4"/></Button>
+              <span className="w-8 text-center text-sm font-bold">{quantity}</span>
+              <Button variant="ghost" size="icon" className="size-10 rounded-full" onClick={() => setQuantity(Math.min(productStock || 99, quantity + 1))}><Plus className="size-4"/></Button>
+            </div>
+
+            <Button size="lg" className="h-12 flex-1 rounded-full font-bold shadow-lg shadow-primary/20 text-base" onClick={() => addToCart(product.id, quantity)}>
               <ShoppingCart className="mr-2 size-5"/>Себетке кошуу
-            </Button>
-
-            {/* Избранное баскычы */}
-            <Button
-              variant="outline"
-              size="icon"
-              className={cn("size-12 rounded-full border-2 transition", inWishlist && "bg-primary/10 border-primary text-primary")}
-              onClick={() => toggleWishlist(product.id)}
-              aria-label="Избранное"
-              title="Тандалгандарга кошуу"
-            >
-              <Heart className={cn("size-5", inWishlist && "fill-primary text-primary")} />
-            </Button>
-
-            {/* Салыштыруу баскычы */}
-            <Button
-              variant="outline"
-              size="icon"
-              className={cn("size-12 rounded-full border-2 transition", inCompare && "bg-primary/10 border-primary text-primary")}
-              onClick={() => toggleCompare(product.id)}
-              aria-label="Салыштыруу"
-              title="Салыштырууга кошуу"
-            >
-              <GitCompareArrows className={cn("size-5", inCompare && "text-primary")} />
             </Button>
           </div>
           
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex gap-3 rounded-xl border p-4">
-              <Truck className="size-5 text-primary"/>
-              <div><b>Тез жеткирүү</b><p className="text-sm text-muted-foreground">Бишкекте 24 саатта</p></div>
+            <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Truck className="size-5"/>
+              </div>
+              <div><b className="text-sm">Тез жеткирүү</b><p className="text-xs text-muted-foreground">Бишкекте 24 саатта</p></div>
             </div>
-            <div className="flex gap-3 rounded-xl border p-4">
-              <ShieldCheck className="size-5 text-primary"/>
-              <div><b>Расмий кепилдик</b><p className="text-sm text-muted-foreground">24 айга чейин</p></div>
+            <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 shadow-sm">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <ShieldCheck className="size-5"/>
+              </div>
+              <div><b className="text-sm">Расмий кепилдик</b><p className="text-xs text-muted-foreground">24 айга чейин</p></div>
             </div>
           </div>
         </div>
@@ -295,13 +301,13 @@ export function ProductDetail({ product }: { product: any }) {
 
       {/* МҮНӨЗДӨМӨЛӨР */}
       {productSpecs.length > 0 && (
-        <section className="mt-14">
-          <h2 className="mb-5 font-mono text-2xl font-bold uppercase">Мүнөздөмөлөр</h2>
-          <div className="overflow-hidden rounded-2xl border">
+        <section className="mt-12">
+          <h2 className="mb-4 font-mono text-xl font-bold uppercase md:text-2xl">Мүнөздөмөлөр</h2>
+          <div className="overflow-hidden rounded-2xl border border-border/60 text-sm">
             {productSpecs.map((s: any, i: number) => (
-              <div key={s.label || i} className={`flex justify-between gap-4 p-4 ${i % 2 ? 'bg-card' : 'bg-secondary/40'}`}>
+              <div key={s.label || i} className={`flex justify-between gap-4 p-3.5 ${i % 2 ? 'bg-card' : 'bg-secondary/30'}`}>
                 <span className="text-muted-foreground">{s.label}</span>
-                <b>{s.value}</b>
+                <b className="font-medium text-foreground">{s.value}</b>
               </div>
             ))}
           </div>
@@ -309,12 +315,12 @@ export function ProductDetail({ product }: { product: any }) {
       )}
 
       {/* ОТЗЫВДАР */}
-      <section className="mt-16 border-t pt-10 space-y-8">
-        <h2 className="font-mono text-2xl font-bold uppercase">Кардарлардын пикирлери</h2>
+      <section className="mt-12 border-t border-border/60 pt-8 space-y-6">
+        <h2 className="font-mono text-xl font-bold uppercase md:text-2xl">Кардарлардын пикирлери</h2>
 
-        <form onSubmit={handleReviewSubmit} className="rounded-2xl border bg-card p-6 space-y-4 shadow-sm">
+        <form onSubmit={handleReviewSubmit} className="rounded-2xl border border-border/60 bg-card p-4 md:p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-base">Бул товар боюнча пикир калтыруу</h3>
+            <h3 className="font-bold text-sm md:text-base">Бул товар боюнча пикир калтыруу</h3>
             <span className="text-xs text-muted-foreground">Катарыңыз: <b className="text-primary">{currentUser}</b></span>
           </div>
           
@@ -339,27 +345,27 @@ export function ProductDetail({ product }: { product: any }) {
               value={comment} 
               onChange={(e) => setComment(e.target.value)}
               placeholder="Товардын сапаты тууралуу пикир жазыңыз..."
-              className="w-full rounded-xl border border-input bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px] mt-1"
+              className="w-full rounded-xl border border-input bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary min-h-[90px] mt-1"
               required 
             />
           </div>
 
-          <Button type="submit" className="font-bold">Пикирди жөнөтүү</Button>
+          <Button type="submit" className="font-bold rounded-xl">Пикирди жөнөтүү</Button>
         </form>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {productReviews.length === 0 ? (
             <p className="text-sm text-muted-foreground py-2">Бул товарга азырынча пикирлер жок.</p>
           ) : (
             productReviews.map((rev: any) => (
-              <div key={rev.id} className="rounded-2xl border bg-card p-5 space-y-2 shadow-sm">
+              <div key={rev.id} className="rounded-2xl border border-border/60 bg-card p-4 space-y-2 shadow-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm text-primary">{rev.author}</span>
                   <span className="text-xs text-muted-foreground">{rev.createdAt}</span>
                 </div>
                 <div className="flex text-amber-400">
                   {[...Array(5)].map((_, i) => (
-                    <span key={i} className={`text-base ${i < rev.rating ? 'text-amber-400' : 'text-muted'}`}>★</span>
+                    <span key={i} className={`text-sm ${i < rev.rating ? 'text-amber-400' : 'text-muted'}`}>★</span>
                   ))}
                 </div>
                 <p className="text-sm text-muted-foreground">{rev.comment}</p>
@@ -371,8 +377,8 @@ export function ProductDetail({ product }: { product: any }) {
 
       {/* ОКШОШ ТОВАРЛАР */}
       {related.length > 0 && (
-        <section className="mt-14">
-          <h2 className="mb-5 font-mono text-2xl font-bold uppercase">Окшош товарлар</h2>
+        <section className="mt-12">
+          <h2 className="mb-4 font-mono text-xl font-bold uppercase md:text-2xl">Окшош товарлар</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {related.map(p => <ProductCard key={p.id} product={p}/>)}
           </div>
