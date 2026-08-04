@@ -20,16 +20,23 @@ export function ProductCard({ product }: { product: Product }) {
   const inWishlist = wishlist.includes(product.id)
   const inCompare = compare.includes(product.id)
 
-  // 1. Аты менен медиа (видео же сүрөт) дарегин камсыздап алуу
   const productName = product.name || (product as any).title || 'Товар'
   const productImage = product.image || (product as any).image_url || '/placeholder.svg'
   const productVideo = (product as any).video || (product as any).video_url
 
-  // Медиа видео файл экендигин текшерүү (.mp4 же Cloudinary видео шилтемеси)
   const isVideo = productVideo || (typeof productImage === 'string' && (productImage.endsWith('.mp4') || productImage.includes('/video/upload/')))
-  const videoSrc = productVideo || productImage
+  let rawVideoSrc = productVideo || productImage
 
-  // 2. Slug же ID боюнча шилтеме
+  // Cloudinary видео болсо, файлдын көлөмүн 80%га чейин кичирейтүү (оптимизация)
+  if (typeof rawVideoSrc === 'string' && rawVideoSrc.includes('/video/upload/')) {
+    rawVideoSrc = rawVideoSrc.replace('/video/upload/', '/video/upload/f_auto,q_auto,w_400/')
+  }
+
+  // Видео үчүн poster (превью сүрөт) даярдоо
+  const posterUrl = typeof productImage === 'string' && !productImage.endsWith('.mp4')
+    ? productImage
+    : (typeof rawVideoSrc === 'string' ? rawVideoSrc.replace(/\.[^/.]+$/, '.jpg') : undefined)
+
   const productPath = `/product/${product.slug || product.id}`
 
   return (
@@ -78,12 +85,13 @@ export function ProductCard({ product }: { product: Product }) {
       <Link href={productPath} className="relative block aspect-square overflow-hidden bg-secondary/40">
         {isVideo ? (
           <video
-            src={videoSrc}
+            src={rawVideoSrc}
+            poster={posterUrl}
             autoPlay
             loop
             muted
             playsInline
-            preload="metadata"
+            preload="none"
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
