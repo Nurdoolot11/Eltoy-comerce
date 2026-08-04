@@ -46,10 +46,14 @@ export function ProductCard({ product }: { product: Product }) {
         ) : null}
       </div>
 
-      {/* Quick actions */}
-      <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+      {/* Quick actions - эми дайыма көрүнүп турат жана клик туура иштейт */}
+      <div className="absolute right-3 top-3 z-10 flex flex-col gap-1.5">
         <button
-          onClick={() => toggleWishlist(product.id)}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            toggleWishlist(product.id)
+          }}
           className={cn(
             'grid size-9 place-items-center rounded-full border border-border bg-background/90 backdrop-blur transition hover:bg-primary hover:text-primary-foreground',
             inWishlist && 'bg-primary text-primary-foreground',
@@ -59,7 +63,11 @@ export function ProductCard({ product }: { product: Product }) {
           <Heart className={cn('size-4', inWishlist && 'fill-current')} />
         </button>
         <button
-          onClick={() => toggleCompare(product.id)}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            toggleCompare(product.id)
+          }}
           className={cn(
             'grid size-9 place-items-center rounded-full border border-border bg-background/90 backdrop-blur transition hover:bg-primary hover:text-primary-foreground',
             inCompare && 'bg-primary text-primary-foreground',

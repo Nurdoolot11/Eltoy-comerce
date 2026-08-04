@@ -23,6 +23,14 @@ function CatalogContent() {
   const [sort, setSort] = useState('featured')
   const [available, setAvailable] = useState(false)
 
+  // URL өзгөргөндө категорияны автоматтык түрдө жаңыртуу
+  useEffect(() => {
+    if (params) {
+      const catParam = params.get('category')
+      if (catParam) setCategory(catParam)
+    }
+  }, [params])
+
   // Supabase'тен товарларды алуу
   useEffect(() => {
     const fetchProducts = async () => {
@@ -46,14 +54,14 @@ function CatalogContent() {
     fetchProducts()
   }, [])
 
-  // Базадагы жана мок товарларды бириктирүү
+  // Базадагы жана статикалык товарларды бириктирүү
   const allProducts = useMemo(() => {
     const dbList = dbProducts || []
     const staticList = staticProducts || []
     return [...dbList, ...staticList]
   }, [dbProducts])
 
-  // Универсалдуу фильтрация
+  // ДАК/ТАК ФИЛЬТРАЦИЯ ЛОГИКАСЫ
   const filtered = useMemo(() => {
     return allProducts
       .filter((p) => {
@@ -65,45 +73,36 @@ function CatalogContent() {
         const text = `${title} ${desc}`.toLowerCase()
         const matchesQuery = !query || text.includes(query.toLowerCase())
 
-        // 2. Категорияны акылдуу текшерүү (Slug, Name, ID боюнча)
+        // 2. ТАК КАТЕГОРИЯЛЫК ТЕКШЕРҮҮ (Сорттолбой аралашып кетпөөсү үчүн)
         let matchesCategory = true
         if (category && category !== 'all') {
           const selectedCatObj = categories.find(
             (c) => c.slug === category || c.name.toLowerCase() === category.toLowerCase()
           )
-          
-          const pCat = String(p.category || '').toLowerCase()
-          const catSlug = selectedCatObj ? selectedCatObj.slug.toLowerCase() : category.toLowerCase()
-          const catName = selectedCatObj ? selectedCatObj.name.toLowerCase() : category.toLowerCase()
 
-          matchesCategory =
-            pCat === catSlug ||
-            pCat === catName ||
-            pCat.includes(catSlug) ||
-            pCat.includes(catName) ||
-            catSlug.includes(pCat) ||
-            catName.includes(pCat)
+          const productCat = String(p.category || '').toLowerCase().trim()
+          const catSlug = selectedCatObj ? selectedCatObj.slug.toLowerCase().trim() : category.toLowerCase().trim()
+          const catName = selectedCatObj ? selectedCatObj.name.toLowerCase().trim() : category.toLowerCase().trim()
+
+          // Өтө так дал келүүчүлүк
+          matchesCategory = productCat === catSlug || productCat === catName
         }
 
-        // 3. Брендди акылдуу текшерүү
+        // 3. ТАК БРЕКИНДИК ТЕКШЕРҮҮ
         let matchesBrand = true
         if (brand && brand !== 'all') {
           const selectedBrandObj = brands.find(
             (b) => b.slug === brand || b.name.toLowerCase() === brand.toLowerCase()
           )
 
-          const pBrand = String(p.brand || '').toLowerCase()
-          const brandSlug = selectedBrandObj ? selectedBrandObj.slug.toLowerCase() : brand.toLowerCase()
-          const brandName = selectedBrandObj ? selectedBrandObj.name.toLowerCase() : brand.toLowerCase()
+          const productBrand = String(p.brand || '').toLowerCase().trim()
+          const brandSlug = selectedBrandObj ? selectedBrandObj.slug.toLowerCase().trim() : brand.toLowerCase().trim()
+          const brandName = selectedBrandObj ? selectedBrandObj.name.toLowerCase().trim() : brand.toLowerCase().trim()
 
-          matchesBrand =
-            pBrand === brandSlug ||
-            pBrand === brandName ||
-            pBrand.includes(brandSlug) ||
-            pBrand.includes(brandName)
+          matchesBrand = productBrand === brandSlug || productBrand === brandName
         }
 
-        // 4. Дополнительный фильтр
+        // 4. Кошумча фильтр (Badges)
         const badges = Array.isArray(p.badges) ? p.badges : []
         const matchesInitialFilter = !initialFilter || badges.includes(initialFilter)
 
