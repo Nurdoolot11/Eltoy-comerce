@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Check, Minus, Plus, ShieldCheck, ShoppingCart, Star, Truck, Play, X, Maximize2 } from 'lucide-react'
+import { Check, Minus, Plus, ShieldCheck, ShoppingCart, Star, Truck, Play, X, Maximize2, Heart, GitCompareArrows } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProductCard } from './product-card'
 import { useCart } from '@/components/cart/cart-provider'
 import { formatSom, getBrandName, products as staticProducts } from '@/lib/data'
-import { getOptimizedImageUrl, getOptimizedVideoUrl } from '@/lib/utils'
+import { cn, getOptimizedImageUrl, getOptimizedVideoUrl } from '@/lib/utils'
 
 export function ProductDetail({ product }: { product: any }) {
   const safeImage = getOptimizedImageUrl(product.image || product.image_url)
@@ -21,7 +21,11 @@ export function ProductDetail({ product }: { product: any }) {
   const [active, setActive] = useState(safeImage)
   const [quantity, setQuantity] = useState(1)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
-  const { addToCart } = useCart()
+  
+  // Cart, Wishlist жана Compare контекстин алуу
+  const { addToCart, toggleWishlist, toggleCompare, wishlist, compare } = useCart()
+  const inWishlist = wishlist.includes(product.id)
+  const inCompare = compare.includes(product.id)
 
   const [reviews, setReviews] = useState<any[]>([])
   const [rating, setRating] = useState(5)
@@ -204,14 +208,40 @@ export function ProductDetail({ product }: { product: any }) {
             {productStock > 0 ? `Складда ${productStock} даана бар` : 'Түгөндү'}
           </p>
           
-          <div className="flex gap-3">
-            <div className="flex items-center rounded-full border">
-              <Button variant="ghost" size="icon" onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus/></Button>
-              <span className="w-10 text-center">{quantity}</span>
-              <Button variant="ghost" size="icon" onClick={() => setQuantity(Math.min(productStock || 99, quantity + 1))}><Plus/></Button>
+          {/* САНЫ ЖАНА КНОПКАЛАР (СЕБЕТ, ЖҮРӨКЧӨ, САЛЫШТЫРУУ) */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center rounded-full border bg-background">
+              <Button variant="ghost" size="icon" className="rounded-l-full" onClick={() => setQuantity(Math.max(1, quantity - 1))}><Minus/></Button>
+              <span className="w-10 text-center font-bold">{quantity}</span>
+              <Button variant="ghost" size="icon" className="rounded-r-full" onClick={() => setQuantity(Math.min(productStock || 99, quantity + 1))}><Plus/></Button>
             </div>
-            <Button size="lg" className="flex-1" onClick={() => addToCart(product.id, quantity)}>
-              <ShoppingCart className="mr-2 size-4"/>Себетке кошуу
+
+            <Button size="lg" className="flex-1 rounded-full font-bold" onClick={() => addToCart(product.id, quantity)}>
+              <ShoppingCart className="mr-2 size-5"/>Себетке кошуу
+            </Button>
+
+            {/* Избранное баскычы */}
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn("size-12 rounded-full border-2 transition", inWishlist && "bg-primary/10 border-primary text-primary")}
+              onClick={() => toggleWishlist(product.id)}
+              aria-label="Избранное"
+              title="Тандалгандарга кошуу"
+            >
+              <Heart className={cn("size-5", inWishlist && "fill-primary text-primary")} />
+            </Button>
+
+            {/* Салыштыруу баскычы */}
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn("size-12 rounded-full border-2 transition", inCompare && "bg-primary/10 border-primary text-primary")}
+              onClick={() => toggleCompare(product.id)}
+              aria-label="Салыштыруу"
+              title="Салыштырууга кошуу"
+            >
+              <GitCompareArrows className={cn("size-5", inCompare && "text-primary")} />
             </Button>
           </div>
           
