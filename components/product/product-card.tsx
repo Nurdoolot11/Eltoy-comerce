@@ -20,9 +20,14 @@ export function ProductCard({ product }: { product: Product }) {
   const inWishlist = wishlist.includes(product.id)
   const inCompare = compare.includes(product.id)
 
-  // 1. Аты менен сүрөтүн камсыздап алуу
+  // 1. Аты менен медиа (видео же сүрөт) дарегин камсыздап алуу
   const productName = product.name || (product as any).title || 'Товар'
   const productImage = product.image || (product as any).image_url || '/placeholder.svg'
+  const productVideo = (product as any).video || (product as any).video_url
+
+  // Медиа видео файл экендигин текшерүү (.mp4 же Cloudinary видео шилтемеси)
+  const isVideo = productVideo || (typeof productImage === 'string' && (productImage.endsWith('.mp4') || productImage.includes('/video/upload/')))
+  const videoSrc = productVideo || productImage
 
   // 2. Slug же ID боюнча шилтеме
   const productPath = `/product/${product.slug || product.id}`
@@ -71,13 +76,25 @@ export function ProductCard({ product }: { product: Product }) {
       </div>
 
       <Link href={productPath} className="relative block aspect-square overflow-hidden bg-secondary/40">
-        <Image
-          src={productImage}
-          alt={productName}
-          fill
-          sizes="(max-width: 768px) 50vw, 25vw"
-          className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
-        />
+        {isVideo ? (
+          <video
+            src={videoSrc}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : (
+          <Image
+            src={productImage}
+            alt={productName}
+            fill
+            sizes="(max-width: 768px) 50vw, 25vw"
+            className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
       </Link>
 
       <div className="flex flex-1 flex-col p-4">
