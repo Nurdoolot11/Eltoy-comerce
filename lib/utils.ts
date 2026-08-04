@@ -11,25 +11,31 @@ export function getOptimizedImageUrl(url: string | undefined | null): string {
 
   // Cloudinary шилтемелерин иштеп чыгуу
   if (typeof url === 'string' && url.includes('/upload/')) {
-    // Эгер видео шилтеме болсо, андан 500px сапаттагы JPG сүрөт катары алуу
-    if (url.includes('/video/upload/') || url.endsWith('.mp4')) {
+    // Эгер видео шилтеме болсо, биринчи кадрдан 500px JPG сүрөт жасап алуу
+    if (url.includes('/video/upload/') || url.match(/\.(mp4|webm|mov|avi)$/i)) {
       return url
-        .replace('/video/upload/', '/video/upload/f_jpg,q_auto,w_500/')
+        .replace('/video/upload/', '/video/upload/so_0,f_jpg,q_auto,w_500/')
         .replace(/\.[^/.]+$/, '.jpg')
     }
-    // Жөнөкөй сүрөт болсо, желеге ылайыктап жеңилдетүү (f_auto, q_auto)
-    return url.replace('/image/upload/', '/image/upload/f_auto,q_auto,w_500/')
+    // Жөнөкөй сүрөттү жеңилдетүү (f_auto, q_auto)
+    return url.replace('/image/upload/', '/image/upload/f_auto,q_auto,w_800/')
   }
 
   return url
 }
 
-// Товардын ичиндеги видеону жеңилдетип ачуу
+// Видеону автоматтык кысуу (Compress) жана жеңилдетип ачуу
 export function getOptimizedVideoUrl(url: string | undefined | null): string {
   if (!url) return ''
 
-  if (typeof url === 'string' && url.includes('/video/upload/')) {
-    return url.replace('/video/upload/', '/video/upload/f_auto,q_auto,w_720/')
+  if (typeof url === 'string' && url.includes('/upload/')) {
+    // q_auto:eco - видеонун МБ көлөмүн сапатын бузбай кысат
+    // vc_auto - бардык смартфондорго ылайыктуу формат тандайт
+    // w_720 - HD форматына келтирип, жүктөлүшүн 3-4 эсе ылдамдатат
+    if (url.includes('/video/upload/')) {
+      return url.replace('/video/upload/', '/video/upload/q_auto:eco,vc_auto,w_720/')
+    }
+    return url.replace('/upload/', '/upload/q_auto:eco,vc_auto,w_720/')
   }
 
   return url
