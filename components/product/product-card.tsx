@@ -1,11 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { Star, Heart, ShoppingCart, GitCompareArrows, Check } from 'lucide-react'
 import { useCart } from '@/components/cart/cart-provider'
 import { formatSom, getBrandName, discountPercent, type Product } from '@/lib/data'
-import { cn } from '@/lib/utils'
+import { cn, getOptimizedImageUrl } from '@/lib/utils'
 
 const badgeLabels: Record<string, { label: string; className: string }> = {
   new: { label: 'Жаңы', className: 'bg-primary text-primary-foreground' },
@@ -21,23 +20,10 @@ export function ProductCard({ product }: { product: Product }) {
   const inCompare = compare.includes(product.id)
 
   const productName = product.name || (product as any).title || 'Товар'
-  const rawImage = product.image || (product as any).image_url || '/placeholder.svg'
-  const rawVideo = (product as any).video || (product as any).video_url
-
-  // Медиа шилтемени аныктоо
-  let displayImage = rawImage
-
-  // Эгер сүрөттүн ордуна видео шилтеме келип калса жана ал Cloudinary болсо, аны заматта ачылуучу СҮРӨТКӨ (.jpg) айландыруу
-  if (typeof displayImage === 'string' && displayImage.includes('/video/upload/')) {
-    displayImage = displayImage
-      .replace('/video/upload/', '/video/upload/f_jpg,q_auto,w_500/')
-      .replace(/\.[^/.]+$/, '.jpg')
-  } else if (typeof displayImage === 'string' && displayImage.endsWith('.mp4') && rawVideo) {
-    // Эгер image да, video да mp4 болуп калса, placeholder же туура сүрөт коюу
-    displayImage = typeof rawVideo === 'string' && rawVideo.includes('/video/upload/')
-      ? rawVideo.replace('/video/upload/', '/video/upload/f_jpg,q_auto,w_500/').replace(/\.[^/.]+$/, '.jpg')
-      : '/placeholder.svg'
-  }
+  
+  // Медиа шилтемени автоматтык түрдө коопсуз сүрөткө айландыруу
+  const rawMedia = product.image || (product as any).image_url || (product as any).video || (product as any).video_url
+  const displayImage = getOptimizedImageUrl(rawMedia)
 
   const productPath = `/product/${product.slug || product.id}`
 
@@ -84,15 +70,17 @@ export function ProductCard({ product }: { product: Product }) {
         </button>
       </div>
 
-      {/* Товардын Сүрөтү (Кара болбой заматта тунук ачылат) */}
+      {/* Товардын Сүрөтү - 100% заматта ачылат, onError тутуму менен */}
       <Link href={productPath} className="relative block aspect-square overflow-hidden bg-secondary/40">
-        <Image
+        <img
           src={displayImage}
           alt={productName}
-          fill
-          unoptimized={typeof displayImage === 'string' && displayImage.includes('cloudinary')}
-          sizes="(max-width: 768px) 50vw, 25vw"
-          className="object-contain p-4 transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          className="h-full w-full object-cover p-2 transition-transform duration-500 group-hover:scale-105"
+          onError={(e) => {
+            // Эгер сүрөттүн шилтемеси бузук болсо, ката чыгарбай placeholder коюу
+            ;(e.target as HTMLImageElement).src = '/placeholder.svg'
+          }}
         />
       </Link>
 

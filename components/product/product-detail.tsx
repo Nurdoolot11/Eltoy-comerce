@@ -1,20 +1,22 @@
 'use client'
 
-import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { Check, Minus, Plus, ShieldCheck, ShoppingCart, Star, Truck, Play, X, Maximize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProductCard } from './product-card'
 import { useCart } from '@/components/cart/cart-provider'
 import { formatSom, getBrandName, products as staticProducts } from '@/lib/data'
+import { getOptimizedImageUrl, getOptimizedVideoUrl } from '@/lib/utils'
 
 export function ProductDetail({ product }: { product: any }) {
-  const safeImage = product.image || product.image_url || '/placeholder.svg'
+  const safeImage = getOptimizedImageUrl(product.image || product.image_url)
   const videoUrl = product.video_url || product.video || null
 
-  const galleryImages = Array.isArray(product.gallery) && product.gallery.length > 0 
+  const rawGallery = Array.isArray(product.gallery) && product.gallery.length > 0 
     ? product.gallery 
-    : (Array.isArray(product.images) && product.images.length > 0 ? product.images : [safeImage])
+    : (Array.isArray(product.images) && product.images.length > 0 ? product.images : [product.image || product.image_url])
+
+  const galleryImages = rawGallery.map((img: string) => getOptimizedImageUrl(img))
 
   const [active, setActive] = useState(safeImage)
   const [quantity, setQuantity] = useState(1)
@@ -92,7 +94,7 @@ export function ProductDetail({ product }: { product: any }) {
         : url.split('v=')[1]?.split('&')[0]
       return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&loop=1`
     }
-    return url
+    return getOptimizedVideoUrl(url)
   }
 
   const isIframeVideo = videoUrl && (videoUrl.includes('instagram.com') || videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be'))
@@ -104,8 +106,15 @@ export function ProductDetail({ product }: { product: any }) {
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Сол тарап: Башкы сүрөт + Pinduoduo стилиндеги видео карточка */}
         <div className="flex flex-col gap-4">
-          <div className="relative aspect-square overflow-hidden rounded-3xl bg-secondary">
-            <Image src={active} alt={productName} fill className="object-contain p-8" priority/>
+          <div className="relative aspect-square overflow-hidden rounded-3xl bg-secondary/40">
+            <img 
+              src={active} 
+              alt={productName} 
+              className="h-full w-full object-contain p-8"
+              onError={(e) => {
+                ;(e.target as HTMLImageElement).src = '/placeholder.svg'
+              }}
+            />
 
             {/* 🎬 PINDUODUO СТИЛИНДЕГИ КИЧИНЕКЕЙ ВЕРТИКАЛДУУ ВИДЕО КАРТОЧКА */}
             {videoUrl && (
@@ -122,11 +131,13 @@ export function ProductDetail({ product }: { product: any }) {
                   />
                 ) : (
                   <video
-                    src={videoUrl}
+                    src={getOptimizedVideoUrl(videoUrl)}
+                    poster={getOptimizedImageUrl(videoUrl)}
                     autoPlay
                     muted
                     loop
                     playsInline
+                    preload="metadata"
                     className="pointer-events-none size-full object-cover opacity-90 transition-opacity group-hover:opacity-100"
                   />
                 )}
@@ -150,8 +161,19 @@ export function ProductDetail({ product }: { product: any }) {
           {galleryImages.length > 1 && (
             <div className="grid grid-cols-4 gap-3">
               {galleryImages.map((src: string, i: number) => (
-                <button key={`${src}-${i}`} onClick={() => setActive(src)} className={`relative aspect-square overflow-hidden rounded-xl border bg-secondary transition ${active === src ? 'ring-2 ring-primary' : ''}`}>
-                  <Image src={src} alt={`${productName} ${i+1}`} fill className="object-contain p-2"/>
+                <button 
+                  key={`${src}-${i}`} 
+                  onClick={() => setActive(src)} 
+                  className={`relative aspect-square overflow-hidden rounded-xl border bg-secondary/40 transition ${active === src ? 'ring-2 ring-primary' : ''}`}
+                >
+                  <img 
+                    src={src} 
+                    alt={`${productName} ${i+1}`} 
+                    className="h-full w-full object-contain p-2"
+                    onError={(e) => {
+                      ;(e.target as HTMLImageElement).src = '/placeholder.svg'
+                    }}
+                  />
                 </button>
               ))}
             </div>
@@ -228,7 +250,8 @@ export function ProductDetail({ product }: { product: any }) {
                 />
               ) : (
                 <video
-                  src={videoUrl}
+                  src={getOptimizedVideoUrl(videoUrl)}
+                  poster={getOptimizedImageUrl(videoUrl)}
                   controls
                   autoPlay
                   playsInline
